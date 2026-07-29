@@ -31,6 +31,24 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* 키보드만으로 조작할 수 있어야 하므로 포커스는 반드시 보이게 */
+:focus-visible {
+  outline: 2px solid var(--color-brass);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+kbd {
+  font-family: var(--font-body);
+  font-size: 0.7em;
+  letter-spacing: 0.04em;
+  border: 1px solid var(--color-line);
+  border-radius: 4px;
+  padding: 0.05em 0.35em;
+  margin-left: 0.35em;
+  vertical-align: 0.08em;
+}
+
 /* 모션은 건반 눌림/떼임 한 곳에만 */
 .piano-key {
   transition: transform 60ms ease-out;
@@ -38,4 +56,15 @@ body {
 }
 .piano-key.pressed {
   transform: translateY(2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .piano-key {
+    transition: none;
+  }
+}
+
+/* 건반은 터치로 눌러야 하므로 브라우저 제스처에 뺏기지 않게 */
+svg[aria-label='건반'] {
+  touch-action: manipulation;
 }

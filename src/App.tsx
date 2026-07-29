@@ -2,14 +2,17 @@ import { useCallback, useEffect, useState } from 'react';
 import { ExploreView } from './views/ExploreView';
 import { MemorizeView } from './views/MemorizeView';
 import { ProgressView } from './views/ProgressView';
+import { SettingsDrawer } from './components/SettingsDrawer';
 import { initAudio, unlockAudio } from './audio/audio';
 import { applyResults, loadProgress, saveProgress } from './state/progress';
+import { loadSettings, saveSettings, type Settings } from './state/settings';
 
 type Mode = 'explore' | 'memorize' | 'progress';
 
 export default function App() {
   const [mode, setMode] = useState<Mode>('explore');
   const [progress, setProgress] = useState(loadProgress);
+  const [settings, setSettings] = useState(loadSettings);
 
   useEffect(() => {
     void initAudio(); // 샘플 버퍼 미리 다운로드 (첫 클릭 렉 방지)
@@ -26,9 +29,14 @@ export default function App() {
     });
   }, []);
 
+  const changeSettings = useCallback((s: Settings) => {
+    setSettings(s);
+    saveSettings(s);
+  }, []);
+
   return (
-    <div className="min-h-screen">
-      <header className="mx-auto flex max-w-3xl items-center justify-between px-4 pt-6">
+    <div className="min-h-screen pb-10">
+      <header className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-2 px-4 pt-5">
         <h1 className="font-display text-xl text-ivory-dim">Rootless</h1>
         <nav className="flex rounded-lg bg-felt-deep p-1">
           {(
@@ -50,8 +58,15 @@ export default function App() {
           ))}
         </nav>
       </header>
+
+      <div className="pt-3">
+        <SettingsDrawer settings={settings} onChange={changeSettings} />
+      </div>
+
       {mode === 'explore' && <ExploreView />}
-      {mode === 'memorize' && <MemorizeView store={progress} onFinish={recordSession} />}
+      {mode === 'memorize' && (
+        <MemorizeView store={progress} onFinish={recordSession} settings={settings} />
+      )}
       {mode === 'progress' && <ProgressView store={progress} />}
     </div>
   );

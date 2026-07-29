@@ -7,6 +7,7 @@ import { chordSymbol, keyLabel } from '../engine/format';
 import { playChord, playNote } from '../audio/audio';
 import { Keyboard, type KeyHighlight } from './Keyboard';
 import { answerCurrent, createSession, remaining, summarize, type Session } from '../session/session';
+import type { ProgressionType } from '../engine/types';
 
 /** 문제 상태: 입력 중 → (정답 보기) 자가채점 대기 → 채점 완료 */
 type QuizPhase = 'input' | 'reveal' | 'graded';
@@ -18,6 +19,8 @@ type Props = {
   onExit: () => void;
   /** 세션이 끝났을 때 item별 첫 시도 결과를 넘긴다 (Leitner 갱신용). 세션당 한 번만 호출된다. */
   onFinish?: (firstTry: Record<string, boolean>) => void;
+  /** 켜둔 진행만 출제 문맥으로 쓴다 */
+  allowedTypes?: ProgressionType[];
 };
 
 function itemLabel(item: Item): string {
@@ -32,9 +35,9 @@ function findItem(id: string): Item | null {
  * 보관함 루프 실행부 — 암기/타입별 모드가 공유한다.
  * 어떤 item을 낼지는 draw()가 정하고, 여기서는 출제·채점·집계만 한다.
  */
-export function DrillRunner({ draw, onExit, onFinish }: Props) {
+export function DrillRunner({ draw, onExit, onFinish, allowedTypes }: Props) {
   const [session, setSession] = useState<Session>(() =>
-    createSession(draw(), Date.now(), Math.random),
+    createSession(draw(), Date.now(), Math.random, allowedTypes),
   );
   const [phase, setPhase] = useState<QuizPhase>('input');
   const [lastCorrect, setLastCorrect] = useState<boolean | null>(null);
@@ -57,7 +60,7 @@ export function DrillRunner({ draw, onExit, onFinish }: Props) {
   }, [session, onFinish]);
 
   function restart() {
-    setSession(createSession(draw(), Date.now(), Math.random));
+    setSession(createSession(draw(), Date.now(), Math.random, allowedTypes));
     setPhase('input');
     setLastCorrect(null);
     setUserNotes([]);
@@ -98,10 +101,21 @@ export function DrillRunner({ draw, onExit, onFinish }: Props) {
     }
   }
 
-  // Space=정답 보기, 1/2=자가채점, Enter=다음
+  // Space=정답 보기, 1/2=자가채점, Enter=다음, Esc=종료 / 종료 화면에선 Enter=한 판 더
   useEffect(() => {
-    if (!session.current) return;
     const h = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onExit();
+        return;
+      }
+      if (!session.current) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          restart();
+        }
+        return;
+      }
       if (e.key === ' ' && phase === 'input') {
         e.preventDefault();
         reveal();
@@ -115,7 +129,7 @@ export function DrillRunner({ draw, onExit, onFinish }: Props) {
     };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
-  }, [session, phase, reveal, grade, next]);
+  });
 
   // ── 종료 화면 ───────────────────────────────────────────
   if (!session.current) {
@@ -160,13 +174,13 @@ export function DrillRunner({ draw, onExit, onFinish }: Props) {
             onClick={restart}
             className="rounded-full border border-brass px-6 py-2.5 text-ivory hover:bg-surface"
           >
-            한 판 더
+            한 판 더 <kbd className="text-muted">Enter</kbd>
           </button>
           <button
             onClick={onExit}
             className="rounded-full border border-line px-6 py-2.5 text-ivory-dim hover:border-muted"
           >
-            바꾸기
+            바꾸기 <kbd className="text-muted">Esc</kbd>
           </button>
         </div>
       </div>
@@ -198,7 +212,7 @@ export function DrillRunner({ draw, onExit, onFinish }: Props) {
           남은 카드 <span className="text-brass">{remaining(session)}</span>
         </div>
         <button onClick={onExit} className="text-sm text-muted hover:text-ivory-dim">
-          나가기
+          나가기 <kbd>Esc</kbd>
         </button>
       </div>
 

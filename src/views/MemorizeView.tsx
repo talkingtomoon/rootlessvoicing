@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Form } from '../engine/types';
-import { allItems, itemsOf } from '../engine/items';
+import { itemsOf } from '../engine/items';
 import { selectItems, type ProgressStore } from '../state/progress';
+import { enabledItems, enabledTypes, type Settings } from '../state/settings';
 import { QUALITIES } from '../engine/voicings';
 import { QUALITY_SYMBOL } from '../engine/format';
 import { ROOT_NAMES, toGlyphs } from '../engine/spelling';
@@ -24,6 +25,7 @@ export type MemorizeMode = 'all' | 'type';
 type Props = {
   store: ProgressStore;
   onFinish: (firstTry: Record<string, boolean>) => void;
+  settings: Settings;
 };
 
 /**
@@ -31,31 +33,66 @@ type Props = {
  * - 전체: Leitner 우선순위로 N장 (간격 지난 것 → 신규 → 단계 낮은 순)
  * - 타입별: quality × form 하나의 12루트 한 바퀴 (선정 규칙을 건너뛰는 직접 지정)
  */
-export function MemorizeView({ store, onFinish }: Props) {
+export function MemorizeView({ store, onFinish, settings }: Props) {
   const [mode, setMode] = useState<MemorizeMode>(loadLastMemorizeMode);
   const [running, setRunning] = useState(false);
   const [n, setN] = useState(loadLastSessionSize);
   const [quality, setQuality] = useState(loadLastQuality);
   const [form, setForm] = useState<Form>(loadLastForm);
 
+  // '전체'가 뽑는 풀은 설정(진행·폼)이 정한다. '타입별'은 직접 지정이라 설정을 타지 않는다.
+  const pool = useMemo(() => enabledItems(settings), [settings]);
+  const types = useMemo(() => enabledTypes(settings), [settings]);
+
   // 초반에는 신규 상한 때문에 N보다 적게 뽑힌다 — 크기별로 실제 몇 장 나올지 미리 보여준다
   const counts = useMemo(() => {
     const m: Record<number, number> = {};
     for (const size of SESSION_SIZES) {
-      m[size] = selectItems(store, allItems(), size, Math.random).length;
+      m[size] = selectItems(store, pool, size, Math.random).length;
     }
     return m;
-  }, [store]);
+  }, [store, pool]);
   const anyCapped = SESSION_SIZES.some((size) => counts[size] < size);
+
+  const start = useCallback((size: number) => {
+    saveLastSessionSize(size);
+    setN(size);
+    setRunning(true);
+  }, []);
+
+  // 시작 화면도 키보드만으로: 1~4 = 세션 크기, Enter = 마지막 크기 / 타입별 시작
+  useEffect(() => {
+    if (running) return;
+    const h = (e: KeyboardEvent) => {
+      if (mode === 'type') {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          setRunning(true);
+        }
+        return;
+      }
+      const idx = ['1', '2', '3', '4'].indexOf(e.key);
+      if (idx >= 0) {
+        e.preventDefault();
+        start(SESSION_SIZES[idx]);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        start(n);
+      }
+    };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [running, mode, n, start]);
 
   if (running) {
     return (
       <DrillRunner
         draw={
           mode === 'all'
-            ? () => selectItems(store, allItems(), n, Math.random)
+            ? () => selectItems(store, pool, n, Math.random)
             : () => itemsOf(quality, form)
         }
+        allowedTypes={types}
         onExit={() => setRunning(false)}
         onFinish={onFinish}
       />
@@ -81,14 +118,11 @@ export function MemorizeView({ store, onFinish }: Props) {
             <h2 className="mt-1 font-display text-3xl text-ivory">몇 장 돌릴까</h2>
           </div>
           <div className="flex gap-3">
-            {SESSION_SIZES.map((size) => (
+            {SESSION_SIZES.map((size, i) => (
               <button
                 key={size}
-                onClick={() => {
-                  saveLastSessionSize(size);
-                  setN(size);
-                  setRunning(true);
-                }}
+                onClick={() => start(size)}
+                title={`단축키 ${i + 1}`}
                 className={`flex h-20 w-20 flex-col items-center justify-center rounded-xl border font-display text-2xl transition-colors ${
                   size === n
                     ? 'border-brass bg-surface text-ivory'
@@ -164,7 +198,7 @@ export function MemorizeView({ store, onFinish }: Props) {
             onClick={() => setRunning(true)}
             className="rounded-full border border-brass px-8 py-3 font-display text-xl text-ivory hover:bg-surface"
           >
-            12장 시작
+            12장 시작 <kbd className="font-body text-sm text-muted">Enter</kbd>
           </button>
         </>
       )}

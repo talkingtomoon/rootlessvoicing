@@ -1,5 +1,6 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toGlyphs } from '../engine/spelling';
+import { NARROW, useMediaQuery } from '../lib/useMediaQuery';
 
 export type KeyHighlight = {
   midi: number;
@@ -43,11 +44,41 @@ function buildKeys(from: number, to: number): { keys: KeyGeom[]; width: number }
   return { keys, width: wIdx * WW };
 }
 
+/** 좁은 화면에서 한 번에 보여줄 반음 수 (한 옥타브 + 위 C) */
+const PAGE_SPAN = 12;
+
 /** 기본 범위 F2–C5 = 채점 허용 범위(GRADE_MIN..GRADE_MAX)와 정확히 일치시킨다 */
 export function Keyboard({ from = 41, to = 72, highlights = [], onKeyPress }: Props) {
-  const { keys, width } = useMemo(() => buildKeys(from, to), [from, to]);
   const [pressed, setPressed] = useState<number | null>(null);
   const releaseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const narrow = useMediaQuery(NARROW);
+
+  // 모바일 세로: 스크롤 대신 한 옥타브씩 페이징한다 (스펙 §8)
+  const maxAnchor = to - PAGE_SPAN;
+  const [anchor, setAnchor] = useState(() => Math.min(48, maxAnchor));
+
+  const [lo, hi] = useMemo(() => {
+    if (highlights.length === 0) return [null, null] as const;
+    const ms = highlights.map((h) => h.midi);
+    return [Math.min(...ms), Math.max(...ms)] as const;
+  }, [highlights]);
+
+  // 하이라이트가 바뀌었을 때만 창을 옮긴다 — 답이 안 보이는 일은 없게 하되,
+  // 사용자가 직접 넘긴 페이지를 매 렌더마다 되돌리지는 않는다
+  const followed = useRef('');
+  useEffect(() => {
+    if (!narrow || lo === null || hi === null) return;
+    const key = `${lo}:${hi}`;
+    if (followed.current === key) return;
+    followed.current = key;
+    if (lo >= anchor && hi <= anchor + PAGE_SPAN) return;
+    const want = hi - lo <= PAGE_SPAN ? lo : hi - PAGE_SPAN;
+    setAnchor(Math.max(from, Math.min(want, maxAnchor)));
+  }, [narrow, lo, hi, anchor, from, maxAnchor]);
+
+  const visFrom = narrow ? anchor : from;
+  const visTo = narrow ? Math.min(anchor + PAGE_SPAN, to) : to;
+  const { keys, width } = useMemo(() => buildKeys(visFrom, visTo), [visFrom, visTo]);
 
   const hlMap = new Map(highlights.map((h) => [h.midi, h]));
 
@@ -68,13 +99,16 @@ export function Keyboard({ from = 41, to = 72, highlights = [], onKeyPress }: Pr
   const whites = keys.filter((k) => !k.black);
   const blacks = keys.filter((k) => k.black);
 
+  const octaveLabel = `${['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'][visFrom % 12]}${Math.floor(visFrom / 12) - 1}`;
+
   return (
-    <svg
-      viewBox={`0 0 ${width} ${FELT + WH + 4}`}
-      className="w-full select-none"
-      role="group"
-      aria-label="건반"
-    >
+    <div className="flex flex-col gap-2">
+      <svg
+        viewBox={`0 0 ${width} ${FELT + WH + 4}`}
+        className="w-full select-none"
+        role="group"
+        aria-label="건반"
+      >
       {/* 해머 펠트 스트립 — 건반 위 빨간 띠 */}
       <rect x={0} y={0} width={width} height={FELT} fill="var(--color-crimson-deep)" />
       <rect x={0} y={FELT - 1.5} width={width} height={1.5} fill="#00000055" />
@@ -154,6 +188,30 @@ export function Keyboard({ from = 41, to = 72, highlights = [], onKeyPress }: Pr
           </g>
         );
       })}
-    </svg>
+      </svg>
+
+      {/* 모바일: 스크롤 대신 한 옥타브씩 넘긴다 */}
+      {narrow && (
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => setAnchor((a) => Math.max(from, a - 12))}
+            disabled={anchor <= from}
+            className="rounded-full border border-line px-4 py-1.5 text-sm text-ivory-dim disabled:opacity-30"
+            aria-label="한 옥타브 아래"
+          >
+            ‹
+          </button>
+          <span className="text-xs tracking-widest text-muted">{octaveLabel}부터</span>
+          <button
+            onClick={() => setAnchor((a) => Math.min(maxAnchor, a + 12))}
+            disabled={anchor >= maxAnchor}
+            className="rounded-full border border-line px-4 py-1.5 text-sm text-ivory-dim disabled:opacity-30"
+            aria-label="한 옥타브 위"
+          >
+            ›
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

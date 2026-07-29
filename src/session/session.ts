@@ -1,3 +1,4 @@
+import type { ProgressionType } from '../engine/types';
 import type { Item, ItemContext, ItemId } from '../engine/items';
 import { contextsFor, itemId } from '../engine/items';
 import { shuffle } from '../lib/shuffle';
@@ -34,9 +35,20 @@ export type Session = {
 
 export const SESSION_SIZES = [12, 30, 60, 120] as const;
 
-export function createSession(items: Item[], startedAt: number, rand: () => number): Session {
+/**
+ * @param allowedTypes 켜둔 진행만 문맥으로 쓴다 (m7은 메이저 ii / 마이너 i 중 택일).
+ *                     해당 문맥이 하나도 없으면 필터를 무시한다.
+ */
+export function createSession(
+  items: Item[],
+  startedAt: number,
+  rand: () => number,
+  allowedTypes?: ProgressionType[],
+): Session {
   const cards: SessionCard[] = shuffle(items, rand).map((item) => {
-    const ctxs = contextsFor(item.rootPc, item.quality);
+    const all = contextsFor(item.rootPc, item.quality);
+    const allowed = allowedTypes ? all.filter((c) => allowedTypes.includes(c.type)) : all;
+    const ctxs = allowed.length > 0 ? allowed : all;
     return { item, ctx: ctxs[Math.floor(rand() * ctxs.length)] };
   });
   const [current, ...queue] = cards;
