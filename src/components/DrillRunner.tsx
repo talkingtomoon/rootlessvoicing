@@ -40,8 +40,13 @@ export function DrillRunner({ draw, onExit, onFinish, allowedTypes }: Props) {
     createSession(draw(), Date.now(), Math.random, allowedTypes),
   );
   const [phase, setPhase] = useState<QuizPhase>('input');
+  /** 이 카드에 실제로 적용될 결과 (정정 후 값) */
   const [lastCorrect, setLastCorrect] = useState<boolean | null>(null);
+  /** 채점 직후의 원래 결과 — 정정했는지 알아내는 용도 */
+  const [autoCorrect, setAutoCorrect] = useState<boolean | null>(null);
   const [userNotes, setUserNotes] = useState<number[]>([]);
+  /** userNotes의 동기 사본 — 같은 프레임의 연속 클릭이 서로를 덮어쓰지 않게 */
+  const notesRef = useRef<number[]>([]);
 
   // 현재 카드의 코드: 심볼·canonical 배치·도수·음이름 (루트 철자는 문맥 무관 고정)
   const chord = useMemo(() => {
@@ -63,7 +68,9 @@ export function DrillRunner({ draw, onExit, onFinish, allowedTypes }: Props) {
     setSession(createSession(draw(), Date.now(), Math.random, allowedTypes));
     setPhase('input');
     setLastCorrect(null);
+    setAutoCorrect(null);
     setUserNotes([]);
+    notesRef.current = [];
   }
 
   const reveal = useCallback(() => {
@@ -74,30 +81,38 @@ export function DrillRunner({ draw, onExit, onFinish, allowedTypes }: Props) {
 
   const grade = useCallback((correct: boolean) => {
     setLastCorrect(correct);
+    setAutoCorrect(correct);
     setPhase('graded');
   }, []);
+
+  /**
+   * 채점 결과 정정. 알고 있었는데 잘못 눌렀을 때 맞음으로 넘긴다.
+   * 카드에 반영되는 건 next() 시점이라 여기서는 표시값만 바꾸면 된다.
+   */
+  const override = useCallback((correct: boolean) => setLastCorrect(correct), []);
 
   const next = useCallback(() => {
     if (lastCorrect === null) return;
     setSession((s) => answerCurrent(s, lastCorrect));
     setPhase('input');
     setLastCorrect(null);
+    setAutoCorrect(null);
     setUserNotes([]);
+    notesRef.current = [];
   }, [lastCorrect]);
 
   function pressKey(midi: number) {
     playNote(midi);
     if (phase !== 'input' || !chord) return;
-    const notes = userNotes.includes(midi)
-      ? userNotes.filter((m) => m !== midi)
-      : [...userNotes, midi];
+    // 한 프레임 안에 여러 번 눌러도 유실되지 않게 ref로 누적한다 (빠르게 치면 실제로 겹친다)
+    const prev = notesRef.current;
+    const notes = prev.includes(midi) ? prev.filter((m) => m !== midi) : [...prev, midi];
+    notesRef.current = notes;
     setUserNotes(notes);
     if (notes.length === 4) {
       // 경로 A: 4음 채워지면 자동 채점 + 정답 공개
-      const ok = gradeAttempt(notes, chord.midi);
       playChord(chord.midi);
-      setLastCorrect(ok);
-      setPhase('graded');
+      grade(gradeAttempt(notes, chord.midi));
     }
   }
 
@@ -125,11 +140,17 @@ export function DrillRunner({ draw, onExit, onFinish, allowedTypes }: Props) {
       } else if (phase === 'graded' && e.key === 'Enter') {
         e.preventDefault();
         next();
+      } else if (phase === 'graded' && (e.key === '1' || e.key === '2')) {
+        // 오입력 정정 — 1=맞음, 2=틀림 (자가채점과 같은 손가락)
+        e.preventDefault();
+        override(e.key === '1');
       }
     };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
   });
+
+  const corrected = phase === 'graded' && autoCorrect === false && lastCorrect === true;
 
   // ── 종료 화면 ───────────────────────────────────────────
   if (!session.current) {
@@ -261,7 +282,26 @@ export function DrillRunner({ draw, onExit, onFinish, allowedTypes }: Props) {
         )}
         {phase === 'graded' && (
           <>
-            <span className="text-sm text-ivory-dim">{lastCorrect ? '정답' : '보관함에 넣었어'}</span>
+            <span className="text-sm text-ivory-dim">
+              {corrected ? '맞음으로 넘김' : lastCorrect ? '정답' : '보관함에 넣었어'}
+            </span>
+            {/* 알고 있었는데 잘못 눌렀을 때 — 오답으로 남기지 않고 넘어간다 */}
+            {lastCorrect === false && (
+              <button
+                onClick={() => override(true)}
+                className="rounded-full border border-line px-4 py-2 text-sm text-ivory-dim hover:border-brass hover:text-ivory"
+              >
+                알고 있었음 <kbd className="text-muted">1</kbd>
+              </button>
+            )}
+            {corrected && (
+              <button
+                onClick={() => override(false)}
+                className="rounded-full border border-line px-4 py-2 text-sm text-muted hover:text-ivory-dim"
+              >
+                되돌리기 <kbd>2</kbd>
+              </button>
+            )}
             <button
               onClick={next}
               className="rounded-full border border-brass px-4 py-2 text-sm text-ivory hover:bg-surface"
