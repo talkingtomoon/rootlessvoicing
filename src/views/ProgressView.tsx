@@ -19,17 +19,19 @@ type Props = {
 /** 진도 대시보드 — 히트맵 두 장이 전부다. 그래프 없음. */
 export function ProgressView({ store, incoming, onAcceptIncoming, onDismissIncoming }: Props) {
   const [copied, setCopied] = useState(false);
+  /** 클립보드가 막힌 환경(권한 거부 등)에서 직접 집어갈 수 있게 링크를 드러낸다 */
+  const [shownLink, setShownLink] = useState<string | null>(null);
 
   async function copyLink() {
     const link = progressLink(store);
     try {
       await navigator.clipboard.writeText(link);
+      setCopied(true);
+      setShownLink(null);
+      setTimeout(() => setCopied(false), 2000);
     } catch {
-      // 클립보드가 막힌 환경에서는 주소창에라도 남겨준다
-      prompt('이 링크를 다른 기기에서 열어라', link);
+      setShownLink(link);
     }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   }
 
   return (
@@ -84,6 +86,16 @@ export function ProgressView({ store, incoming, onAcceptIncoming, onDismissIncom
           {copied ? '복사했어' : '진도 링크 복사'}
         </button>
         <span className="text-[11px] text-muted">다른 기기에서 그 링크를 열면 진도가 옮겨간다</span>
+        {shownLink && (
+          <input
+            readOnly
+            value={shownLink}
+            onFocus={(e) => e.currentTarget.select()}
+            ref={(el) => el?.select()}
+            className="mt-1 w-full max-w-md rounded-md border border-line bg-felt-deep px-2 py-1 text-[11px] text-ivory-dim"
+            aria-label="진도 링크"
+          />
+        )}
       </div>
     </div>
   );
