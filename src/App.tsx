@@ -102,6 +102,7 @@ export default function App() {
           incoming={incoming}
           onAcceptIncoming={acceptIncoming}
           onDismissIncoming={dismissIncoming}
+          onPasted={setIncoming}
         />
       )}
     </div>

@@ -87,6 +87,17 @@ export function readIncoming(hash = location.hash): ProgressStore | null {
   return m ? decodeProgress(m[1]) : null;
 }
 
+/**
+ * 붙여넣은 것에서 진도를 읽는다. 링크 전체든 코드만이든 받는다.
+ * 출처가 다른 링크(로컬 → 배포본)를 옮길 때는 클릭이 아니라 이 경로를 쓴다.
+ */
+export function parsePasted(text: string): ProgressStore | null {
+  const s = text.trim();
+  if (!s) return null;
+  const m = s.match(new RegExp(`[#&?]${HASH_KEY}=([^&\\s]+)`));
+  return decodeProgress(m ? m[1] : s);
+}
+
 export function clearIncoming(): void {
   history.replaceState(null, '', location.pathname + location.search);
 }

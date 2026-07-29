@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { allItems } from '../engine/items';
 import { Heatmap, HeatmapLegend } from '../components/Heatmap';
 import { levelOf, type ProgressStore } from '../state/progress';
-import { progressLink } from '../state/progressCode';
+import { parsePasted, progressLink } from '../state/progressCode';
 
 function learnedCount(store: ProgressStore): number {
   return allItems().filter((it) => levelOf(store, it) !== null).length;
@@ -14,13 +14,35 @@ type Props = {
   incoming: ProgressStore | null;
   onAcceptIncoming: () => void;
   onDismissIncoming: () => void;
+  /** 붙여넣기로 읽은 진도 — 확인 절차는 incoming과 같다 */
+  onPasted: (store: ProgressStore) => void;
 };
 
 /** 진도 대시보드 — 히트맵 두 장이 전부다. 그래프 없음. */
-export function ProgressView({ store, incoming, onAcceptIncoming, onDismissIncoming }: Props) {
+export function ProgressView({
+  store,
+  incoming,
+  onAcceptIncoming,
+  onDismissIncoming,
+  onPasted,
+}: Props) {
   const [copied, setCopied] = useState(false);
   /** 클립보드가 막힌 환경(권한 거부 등)에서 직접 집어갈 수 있게 링크를 드러낸다 */
   const [shownLink, setShownLink] = useState<string | null>(null);
+  const [pasting, setPasting] = useState(false);
+  const [pasteError, setPasteError] = useState(false);
+
+  function tryPaste(text: string) {
+    if (!text.trim()) return;
+    const parsed = parsePasted(text);
+    if (!parsed) {
+      setPasteError(true);
+      return;
+    }
+    setPasteError(false);
+    setPasting(false);
+    onPasted(parsed);
+  }
 
   async function copyLink() {
     const link = progressLink(store);
@@ -78,14 +100,38 @@ export function ProgressView({ store, incoming, onAcceptIncoming, onDismissIncom
 
       <HeatmapLegend />
 
-      <div className="flex flex-col items-center gap-1.5">
-        <button
-          onClick={copyLink}
-          className="rounded-full border border-line px-5 py-2 text-sm text-ivory-dim hover:border-brass hover:text-ivory"
-        >
-          {copied ? '복사했어' : '진도 링크 복사'}
-        </button>
+      <div className="flex w-full max-w-md flex-col items-center gap-1.5">
+        <div className="flex gap-2">
+          <button
+            onClick={copyLink}
+            className="rounded-full border border-line px-5 py-2 text-sm text-ivory-dim hover:border-brass hover:text-ivory"
+          >
+            {copied ? '복사했어' : '진도 링크 복사'}
+          </button>
+          <button
+            onClick={() => {
+              setPasting((v) => !v);
+              setPasteError(false);
+            }}
+            className="rounded-full border border-line px-5 py-2 text-sm text-ivory-dim hover:border-brass hover:text-ivory"
+          >
+            링크 붙여넣기
+          </button>
+        </div>
         <span className="text-[11px] text-muted">다른 기기에서 그 링크를 열면 진도가 옮겨간다</span>
+
+        {/* 출처가 다른 링크(로컬 → 배포본)는 클릭으로 못 옮기니 붙여넣기로 받는다 */}
+        {pasting && (
+          <input
+            autoFocus
+            placeholder="진도 링크나 코드를 붙여넣어라"
+            onPaste={(e) => tryPaste(e.clipboardData.getData('text'))}
+            onChange={(e) => tryPaste(e.currentTarget.value)}
+            className="mt-1 w-full rounded-md border border-line bg-felt-deep px-2 py-1.5 text-[11px] text-ivory-dim"
+            aria-label="진도 링크 붙여넣기"
+          />
+        )}
+        {pasteError && <span className="text-[11px] text-muted">읽을 수 없는 코드다</span>}
         {shownLink && (
           <input
             readOnly

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { allItems, itemId } from '../../engine/items';
 import { applyResults, emptyProgress, isDue, type ProgressStore } from '../progress';
-import { decodeProgress, encodeProgress, readIncoming } from '../progressCode';
+import { decodeProgress, encodeProgress, parsePasted, readIncoming } from '../progressCode';
 
 function storeOf(session: number, entries: [number, number, number][]): ProgressStore {
   const all = allItems();
@@ -78,6 +78,18 @@ describe('진도 코드', () => {
     expect(all).toHaveLength(120);
     expect(itemId(all[0])).toBe('0:m7:A');
     expect(itemId(all[119])).toBe('11:dom7b9:B');
+  });
+
+  it('parsePasted: 링크 전체든 코드만이든, 출처가 달라도 읽는다', () => {
+    const store = storeOf(7, [[10, 2, 5]]);
+    const code = encodeProgress(store);
+    expect(parsePasted(code)).toEqual(store);
+    expect(parsePasted(`http://localhost:4174/#p=${code}`)).toEqual(store);
+    expect(parsePasted(`https://talkingtomoon.github.io/rootlessvoicing/#p=${code}`)).toEqual(store);
+    expect(parsePasted(`  http://localhost:4174/?v=1#p=${code}  `)).toEqual(store);
+    expect(parsePasted('')).toBeNull();
+    expect(parsePasted('https://example.com/')).toBeNull();
+    expect(parsePasted('#p=쓰레기')).toBeNull();
   });
 
   it('readIncoming: 주소에서 코드를 읽는다', () => {
