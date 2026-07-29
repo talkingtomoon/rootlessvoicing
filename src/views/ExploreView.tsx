@@ -77,17 +77,14 @@ export function ExploreView() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-8">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-display text-xl text-ivory-dim">Rootless</h1>
-        <div className="flex gap-2">
-          <Seg
-            options={['major', 'minor'] as ProgressionType[]}
-            labels={['Major ii–V–I', 'Minor ii–V–i']}
-            value={type}
-            onChange={setType}
-          />
-          <Seg options={['A', 'B'] as Form[]} labels={['A형', 'B형']} value={form} onChange={setForm} />
-        </div>
+      <header className="flex flex-wrap items-center justify-end gap-2">
+        <Seg
+          options={['major', 'minor'] as ProgressionType[]}
+          labels={['Major ii–V–I', 'Minor ii–V–i']}
+          value={type}
+          onChange={setType}
+        />
+        <Seg options={['A', 'B'] as Form[]} labels={['A형', 'B형']} value={form} onChange={setForm} />
       </header>
 
       <div className="flex flex-wrap gap-1.5">
