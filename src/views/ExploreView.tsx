@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Form, ProgressionType } from '../engine/types';
 import { buildProgression, placeProgression } from '../engine/progressions';
-import { MAJOR_KEYS, MINOR_KEYS, toGlyphs } from '../engine/spelling';
+import { ROOT_NAMES, toGlyphs } from '../engine/spelling';
 import { chordSymbol, keyLabel } from '../engine/format';
 import { playChord, playChordSequence, playNote } from '../audio/audio';
 import { Keyboard, type KeyHighlight } from '../components/Keyboard';
@@ -45,8 +45,6 @@ export function ExploreView() {
   // 탐색은 항상 진행 문맥 — 개별 클릭·연속 재생 모두 placeProgression 배치
   const placed = useMemo(() => placeProgression(keyPc, type, form), [keyPc, type, form]);
 
-  const keyNames = type === 'major' ? MAJOR_KEYS : MINOR_KEYS;
-
   function clearTimers() {
     timers.current.forEach(clearTimeout);
     timers.current = [];
@@ -88,7 +86,7 @@ export function ExploreView() {
       </header>
 
       <div className="flex flex-wrap gap-1.5">
-        {keyNames.map((name, pc) => (
+        {ROOT_NAMES.map((name, pc) => (
           <button
             key={pc}
             onClick={() => setKeyPc(pc)}

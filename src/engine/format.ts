@@ -18,7 +18,7 @@ export function chordSymbol(rootName: string, quality: ChordQuality): string {
   return toGlyphs(rootName) + toGlyphs(QUALITY_SYMBOL[quality]);
 }
 
-/** eyebrow용 키 라벨: 'D♭ major' */
+/** 문맥 라벨: 'E♭ major' */
 export function keyLabel(keyPc: number, type: ProgressionType): string {
-  return `${toGlyphs(keyName(keyPc, type))} ${type}`;
+  return `${toGlyphs(keyName(keyPc))} ${type}`;
 }

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { getVoicing, QUALITIES } from '../voicings';
 import { placeVoicing, LOWEST_MIN, LOWEST_MAX } from '../placement';
 import { buildProgression, placeProgression, PROGRESSIONS } from '../progressions';
-import { keyName, notePc, spellInterval, spellVoicing, toGlyphs, MAJOR_KEYS, MINOR_KEYS } from '../spelling';
+import { keyName, notePc, spellInterval, spellVoicing, toGlyphs, ROOT_NAMES } from '../spelling';
 import { allItems, contextsFor, itemId, parseItemId } from '../items';
 import { chordSymbol } from '../format';
 import type { Form, ProgressionType } from '../types';
@@ -112,8 +112,8 @@ describe('보이스리딩: 전 12키 × 메이저/마이너 × A/B', () => {
           for (let i = 1; i < chords.length; i++) {
             const prev = new Set(chords[i - 1].midi.map((n) => n % 12));
             const moved = chords[i].midi.filter((n) => !prev.has(n % 12)).length;
-            expect(moved, `${keyName(keyPc, type)} ${type} ${form} chord ${i}`).toBeGreaterThanOrEqual(1);
-            expect(moved, `${keyName(keyPc, type)} ${type} ${form} chord ${i}`).toBeLessThanOrEqual(3);
+            expect(moved, `${keyName(keyPc)} ${type} ${form} chord ${i}`).toBeGreaterThanOrEqual(1);
+            expect(moved, `${keyName(keyPc)} ${type} ${form} chord ${i}`).toBeLessThanOrEqual(3);
           }
         }
       }
@@ -133,7 +133,7 @@ describe('보이스리딩: 전 12키 × 메이저/마이너 × A/B', () => {
           for (let i = 1; i < placed.length; i++) {
             const diffs = placed[i].map((n, j) => Math.abs(n - placed[i - 1][j]));
             const moved = diffs.filter((d) => d > 0).length;
-            const label = `${keyName(keyPc, type)} ${type} ${form} chord ${i}`;
+            const label = `${keyName(keyPc)} ${type} ${form} chord ${i}`;
             expect(moved, label).toBeGreaterThanOrEqual(1);
             expect(moved, label).toBeLessThanOrEqual(3);
             expect(Math.max(...diffs), label).toBeLessThanOrEqual(2);
@@ -145,31 +145,30 @@ describe('보이스리딩: 전 12키 × 메이저/마이너 × A/B', () => {
 });
 
 describe('음이름 표기', () => {
-  it('도수 기반 철자 케이스', () => {
-    expect(spellInterval('Db', '3', 4)).toBe('F');
-    expect(spellInterval('G', 'b9', 13)).toBe('Ab');
+  it('루트는 문맥 무관 고정 표기 — 같은 item은 어떤 키로 출제돼도 같은 심볼', () => {
+    expect(ROOT_NAMES).toHaveLength(12);
+    // pc 1은 항상 C#, pc 3은 항상 Eb (진행 토닉과 무관)
+    expect(buildProgression(1, 'major', 'A')[2].rootName).toBe('C#'); // C# major의 I
+    expect(buildProgression(11, 'major', 'A')[0].rootName).toBe('C#'); // B major의 ii
+    expect(buildProgression(6, 'minor', 'A')[1].rootName).toBe('C#'); // F# minor의 V
+    expect(keyName(1)).toBe('C#');
+    expect(keyName(8)).toBe('Ab');
+  });
+
+  it('보이싱 음은 루트 기준 도수 철자', () => {
     expect(spellInterval('Eb', 'b3', 3)).toBe('Gb');
-    expect(spellInterval('G#', '3', 4)).toBe('B#'); // C# minor의 V(G#7b9)의 3음
-    expect(spellInterval('Ab', 'b3', 3)).toBe('Cb'); // Gb major의 ii(Abm7)의 b3
+    expect(spellInterval('G', 'b9', 13)).toBe('Ab');
     expect(spellInterval('B', 'b9', 13)).toBe('C');
   });
 
-  it('Db major 진행에 C#이 등장하지 않는다', () => {
-    for (const form of FORMS) {
-      for (const chord of buildProgression(1, 'major', form)) {
-        expect(chord.noteNames).not.toContain('C#');
-        expect(chord.rootName).not.toBe('C#');
+  it('겹임시표는 홑임시표로 단순화한다', () => {
+    // Ebm7b5의 b5 = Bbb → A
+    expect(spellVoicing('Eb', getVoicing('m7b5', 'A'))).toEqual(['Gb', 'A', 'Db', 'Eb']);
+    for (const item of allItems()) {
+      for (const name of spellVoicing(ROOT_NAMES[item.rootPc], getVoicing(item.quality, item.form))) {
+        expect(name, `${ROOT_NAMES[item.rootPc]} ${item.quality}`).not.toMatch(/bb|##/);
       }
     }
-  });
-
-  it('키 이름: 메이저는 플랫 계열, 마이너는 관용 표기', () => {
-    expect(keyName(1, 'major')).toBe('Db');
-    expect(keyName(6, 'major')).toBe('Gb');
-    expect(keyName(1, 'minor')).toBe('C#');
-    expect(keyName(8, 'minor')).toBe('G#');
-    expect(MAJOR_KEYS).toHaveLength(12);
-    expect(MINOR_KEYS).toHaveLength(12);
   });
 
   it('전 진행의 모든 음이름이 그 코드의 pitch class와 일치한다', () => {
@@ -205,7 +204,7 @@ describe('코드 심볼 표기', () => {
   it('마이너 i도 메이저 ii와 같은 m7 표기 (같은 보이싱 = 같은 라벨)', () => {
     expect(labels(0, 'major')).toEqual(['Dm7', 'G7', 'Cmaj7']);
     expect(labels(0, 'minor')).toEqual(['Dm7♭5', 'G7♭9', 'Cm7']);
-    expect(labels(1, 'major')).toEqual(['E♭m7', 'A♭7', 'D♭maj7']);
+    expect(labels(1, 'major')).toEqual(['E♭m7', 'A♭7', 'C♯maj7']); // 루트 고정 표기: pc1 = C♯
   });
 
   function labels(keyPc: number, type: ProgressionType): string[] {

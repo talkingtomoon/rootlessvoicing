@@ -1,14 +1,17 @@
-import type { NoteName, ProgressionType, Voicing } from './types';
+import type { NoteName, Voicing } from './types';
 
 const LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'] as const;
 const LETTER_PC: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
 
-/** 진행의 키 이름 (관용적 재즈 표기). 인덱스 = pitch class */
-export const MAJOR_KEYS: NoteName[] = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
-export const MINOR_KEYS: NoteName[] = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'G#', 'A', 'Bb', 'B'];
+/**
+ * 코드 루트 관용 표기 — item당 하나 고정, 문맥(키) 무관.
+ * 같은 item은 어떤 문맥으로 출제돼도 항상 같은 심볼로 보인다.
+ */
+export const ROOT_NAMES: NoteName[] = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
 
-export function keyName(keyPc: number, type: ProgressionType): NoteName {
-  return (type === 'major' ? MAJOR_KEYS : MINOR_KEYS)[((keyPc % 12) + 12) % 12];
+/** 키 이름도 같은 고정 표기를 쓴다 — 토닉 기준 철자 로직 없음 */
+export function keyName(keyPc: number): NoteName {
+  return ROOT_NAMES[((keyPc % 12) + 12) % 12];
 }
 
 export function notePc(name: NoteName): number {
@@ -32,9 +35,19 @@ export function spellInterval(root: NoteName, degree: string, semitones: number)
   return letter + (acc >= 0 ? '#'.repeat(acc) : 'b'.repeat(-acc));
 }
 
-/** 보이싱 4음의 음이름 (낮은 성부부터) */
+const FLAT_NAMES: NoteName[] = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+const SHARP_NAMES: NoteName[] = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+/** 겹임시표는 표시하지 않는다 — 같은 방향의 홑임시표/제자리표로 단순화 (예: E♭m7♭5의 ♭5 = B𝄫 → A) */
+function simplify(name: NoteName): NoteName {
+  if (name.includes('bb')) return FLAT_NAMES[notePc(name)];
+  if (name.includes('##')) return SHARP_NAMES[notePc(name)];
+  return name;
+}
+
+/** 보이싱 4음의 음이름 (낮은 성부부터), 도수 기반 철자 + 겹임시표 단순화 */
 export function spellVoicing(root: NoteName, voicing: Voicing): NoteName[] {
-  return voicing.intervals.map((iv, i) => spellInterval(root, voicing.degrees[i], iv % 12));
+  return voicing.intervals.map((iv, i) => simplify(spellInterval(root, voicing.degrees[i], iv % 12)));
 }
 
 /** ASCII → 표시용 글리프 ('Db' → 'D♭', 'b3' → '♭3') */

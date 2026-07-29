@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { allItems, contextsFor, itemId, type Item } from '../engine/items';
+import { allItems, itemId, type Item } from '../engine/items';
 import { gradeAttempt } from '../engine/grading';
-import { toGlyphs } from '../engine/spelling';
+import { ROOT_NAMES, toGlyphs } from '../engine/spelling';
 import { buildProgression, PROGRESSIONS } from '../engine/progressions';
 import { chordSymbol, keyLabel } from '../engine/format';
 import { playChord, playNote } from '../audio/audio';
@@ -21,14 +21,7 @@ import { loadLastSessionSize, saveLastSessionSize } from '../state/prefs';
 type QuizPhase = 'input' | 'reveal' | 'graded';
 
 function itemLabel(item: Item): string {
-  return `${chordSymbol(contextRootName(item), item.quality)} ${item.form}형`;
-}
-
-function contextRootName(item: Item): string {
-  // 문맥 없는 표시(종료 화면)용 루트 철자: 첫 문맥 기준
-  const ctx = contextsFor(item.rootPc, item.quality)[0];
-  const slotIdx = PROGRESSIONS[ctx.type].findIndex((s) => s.roman === ctx.roman);
-  return buildProgression(ctx.keyPc, ctx.type, item.form)[slotIdx].rootName;
+  return `${chordSymbol(ROOT_NAMES[item.rootPc], item.quality)} ${item.form}형`;
 }
 
 export function MemorizeView() {
@@ -38,7 +31,7 @@ export function MemorizeView() {
   const [userNotes, setUserNotes] = useState<number[]>([]);
   const [lastN, setLastN] = useState(loadLastSessionSize);
 
-  // 현재 카드의 문맥 코드: 심볼·canonical 배치·도수·음이름
+  // 현재 카드의 코드: 심볼·canonical 배치·도수·음이름 (루트 철자는 문맥 무관 고정)
   const chord = useMemo(() => {
     const card = session?.current;
     if (!card) return null;
@@ -219,17 +212,18 @@ export function MemorizeView() {
         </button>
       </div>
 
+      {/* 문제 화면은 코드 심볼 + 폼만. 문맥(키·도수)은 정답 공개 후에만 사후 정보로 보여준다. */}
       <div className="text-center">
-        <div className="text-xs tracking-widest text-muted">
-          {keyLabel(card.ctx.keyPc, card.ctx.type)} · {card.ctx.roman}
-        </div>
-        <div className="mt-1 flex items-baseline justify-center gap-3">
+        <div className="flex items-baseline justify-center gap-3">
           <span className="font-display text-6xl text-ivory">
             {chordSymbol(chord!.rootName, card.item.quality)}
           </span>
           <span className="rounded-md border border-line px-2 py-0.5 text-sm text-ivory-dim">
             {card.item.form}형
           </span>
+        </div>
+        <div className="mt-2 min-h-4 text-xs tracking-widest text-muted">
+          {revealed ? `${keyLabel(card.ctx.keyPc, card.ctx.type)} · ${card.ctx.roman}` : ''}
         </div>
       </div>
 
