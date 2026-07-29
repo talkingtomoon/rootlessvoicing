@@ -3,7 +3,7 @@ import { ExploreView } from './views/ExploreView';
 import { MemorizeView } from './views/MemorizeView';
 import { ProgressView } from './views/ProgressView';
 import { SettingsDrawer } from './components/SettingsDrawer';
-import { initAudio, unlockAudio } from './audio/audio';
+import { initAudio, installAudioUnlock } from './audio/audio';
 import { applyResults, loadProgress, saveProgress } from './state/progress';
 import { clearIncoming, readIncoming } from './state/progressCode';
 import { loadSettings, saveSettings, type Settings } from './state/settings';
@@ -19,9 +19,7 @@ export default function App() {
 
   useEffect(() => {
     void initAudio(); // 샘플 버퍼 미리 다운로드 (첫 클릭 렉 방지)
-    const unlock = () => void unlockAudio();
-    window.addEventListener('pointerdown', unlock, { once: true });
-    return () => window.removeEventListener('pointerdown', unlock);
+    return installAudioUnlock(); // 제스처가 오면 오디오를 깨운다 (iOS 대응)
   }, []);
 
   const recordSession = useCallback((firstTry: Record<string, boolean>) => {
