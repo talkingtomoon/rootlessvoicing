@@ -5,6 +5,9 @@ import { QUALITIES } from '../engine/voicings';
 const LAST_N_KEY = 'rootless:lastSessionSize';
 const LAST_QUALITY_KEY = 'rootless:lastQuality';
 const LAST_FORM_KEY = 'rootless:lastForm';
+const LAST_ORDER_KEY = 'rootless:lastOrder';
+const LAST_EXPLORE_MODE_KEY = 'rootless:lastExploreMode';
+const LAST_MEMORIZE_MODE_KEY = 'rootless:lastMemorizeMode';
 
 export function loadLastSessionSize(): number {
   const v = Number(localStorage.getItem(LAST_N_KEY));
@@ -30,4 +33,29 @@ export function loadLastForm(): Form {
 
 export function saveLastForm(f: Form): void {
   localStorage.setItem(LAST_FORM_KEY, f);
+}
+
+/** 타입별 듣기의 12루트 나열 순서 */
+export function loadLastOrder(): 'fourths' | 'chromatic' {
+  return localStorage.getItem(LAST_ORDER_KEY) === 'chromatic' ? 'chromatic' : 'fourths';
+}
+
+export function saveLastOrder(o: 'fourths' | 'chromatic'): void {
+  localStorage.setItem(LAST_ORDER_KEY, o);
+}
+
+export function loadLastMemorizeMode(): 'all' | 'type' {
+  return localStorage.getItem(LAST_MEMORIZE_MODE_KEY) === 'type' ? 'type' : 'all';
+}
+
+export function saveLastMemorizeMode(m: 'all' | 'type'): void {
+  localStorage.setItem(LAST_MEMORIZE_MODE_KEY, m);
+}
+
+export function loadLastExploreMode(): 'progression' | 'type' {
+  return localStorage.getItem(LAST_EXPLORE_MODE_KEY) === 'type' ? 'type' : 'progression';
+}
+
+export function saveLastExploreMode(m: 'progression' | 'type'): void {
+  localStorage.setItem(LAST_EXPLORE_MODE_KEY, m);
 }

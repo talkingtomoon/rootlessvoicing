@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
 import { ExploreView } from './views/ExploreView';
 import { MemorizeView } from './views/MemorizeView';
-import { TypeDrillView } from './views/TypeDrillView';
 import { initAudio, unlockAudio } from './audio/audio';
 
-type Mode = 'explore' | 'memorize' | 'type';
+type Mode = 'explore' | 'memorize';
 
 export default function App() {
   const [mode, setMode] = useState<Mode>('explore');
@@ -25,7 +24,6 @@ export default function App() {
             [
               ['explore', '탐색'],
               ['memorize', '암기'],
-              ['type', '타입별'],
             ] as [Mode, string][]
           ).map(([m, label]) => (
             <button
@@ -40,9 +38,7 @@ export default function App() {
           ))}
         </nav>
       </header>
-      {mode === 'explore' && <ExploreView />}
-      {mode === 'memorize' && <MemorizeView />}
-      {mode === 'type' && <TypeDrillView />}
+      {mode === 'explore' ? <ExploreView /> : <MemorizeView />}
     </div>
   );
 }

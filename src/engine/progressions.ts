@@ -1,7 +1,7 @@
-import type { ChordQuality, Form, NoteName, ProgressionType } from './types';
+import type { ChordQuality, Form, ProgressionType } from './types';
 import { getVoicing } from './voicings';
 import { placeVoicing } from './placement';
-import { ROOT_NAMES, spellVoicing } from './spelling';
+import { buildChord, type Chord } from './chord';
 
 export type ProgressionSlot = {
   roman: string;
@@ -24,37 +24,14 @@ export const PROGRESSIONS: Record<ProgressionType, ProgressionSlot[]> = {
   ],
 };
 
-export type ProgressionChord = {
-  roman: string;
-  quality: ChordQuality;
-  form: Form;
-  rootName: NoteName;
-  rootPc: number;
-  /** 낮은 성부부터, canonical 배치 */
-  midi: number[];
-  /** midi와 같은 순서의 음이름 */
-  noteNames: NoteName[];
-  /** midi와 같은 순서의 도수 라벨 */
-  degrees: string[];
-};
+export type ProgressionChord = Chord & { roman: string };
 
 /** ii–V–I 세 코드를 철자·canonical 배치까지 계산. 루트 철자는 고정 표기(ROOT_NAMES). */
 export function buildProgression(keyPc: number, type: ProgressionType, form: Form): ProgressionChord[] {
-  return PROGRESSIONS[type].map((slot) => {
-    const rootPc = ((keyPc + slot.rootOffset) % 12 + 12) % 12;
-    const rootName = ROOT_NAMES[rootPc];
-    const voicing = getVoicing(slot.quality, form);
-    return {
-      roman: slot.roman,
-      quality: slot.quality,
-      form,
-      rootName,
-      rootPc,
-      midi: placeVoicing(rootPc, voicing),
-      noteNames: spellVoicing(rootName, voicing),
-      degrees: [...voicing.degrees],
-    };
-  });
+  return PROGRESSIONS[type].map((slot) => ({
+    ...buildChord(keyPc + slot.rootOffset, slot.quality, form),
+    roman: slot.roman,
+  }));
 }
 
 /**

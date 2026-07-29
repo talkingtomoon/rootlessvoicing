@@ -5,6 +5,7 @@ import { buildProgression, placeProgression, PROGRESSIONS } from '../progression
 import { keyName, notePc, spellInterval, spellVoicing, toGlyphs, ROOT_NAMES } from '../spelling';
 import { allItems, contextsFor, itemId, itemsOf, parseItemId } from '../items';
 import { chordSymbol } from '../format';
+import { buildChord, CHROMATIC_ORDER, FOURTHS_ORDER } from '../chord';
 import type { Form, ProgressionType } from '../types';
 
 const FORMS: Form[] = ['A', 'B'];
@@ -210,6 +211,45 @@ describe('코드 심볼 표기', () => {
   function labels(keyPc: number, type: ProgressionType): string[] {
     return buildProgression(keyPc, type, 'A').map((c) => chordSymbol(c.rootName, c.quality));
   }
+});
+
+describe('단일 코드 (진행 문맥 없음)', () => {
+  it('buildChord는 canonical 배치를 쓴다', () => {
+    for (const item of allItems()) {
+      const chord = buildChord(item.rootPc, item.quality, item.form);
+      expect(chord.midi).toEqual(placeVoicing(item.rootPc, getVoicing(item.quality, item.form)));
+      expect(chord.rootName).toBe(ROOT_NAMES[item.rootPc]);
+      expect(chord.noteNames).toHaveLength(4);
+    }
+  });
+
+  it('진행 안의 코드와 심볼·음이름이 일치한다 (같은 item = 같은 표기)', () => {
+    for (let keyPc = 0; keyPc < 12; keyPc++) {
+      for (const type of TYPES) {
+        for (const form of FORMS) {
+          for (const pc of buildProgression(keyPc, type, form)) {
+            const standalone = buildChord(pc.rootPc, pc.quality, form);
+            expect(standalone.rootName).toBe(pc.rootName);
+            expect(standalone.noteNames).toEqual(pc.noteNames);
+            expect(standalone.midi).toEqual(pc.midi);
+          }
+        }
+      }
+    }
+  });
+
+  it('4도권 순서: 12루트 한 바퀴, 매 스텝 완전4도(+5반음)', () => {
+    expect(new Set(FOURTHS_ORDER).size).toBe(12);
+    for (let i = 1; i < FOURTHS_ORDER.length; i++) {
+      expect((FOURTHS_ORDER[i - 1] + 5) % 12).toBe(FOURTHS_ORDER[i]);
+    }
+    // 한 바퀴 돌아 처음으로 이어진다
+    expect((FOURTHS_ORDER[11] + 5) % 12).toBe(FOURTHS_ORDER[0]);
+  });
+
+  it('반음계 순서: 0..11', () => {
+    expect(CHROMATIC_ORDER).toEqual([...Array(12).keys()]);
+  });
 });
 
 describe('items', () => {
