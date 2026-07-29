@@ -5,12 +5,15 @@ import { ProgressView } from './views/ProgressView';
 import { SettingsDrawer } from './components/SettingsDrawer';
 import { initAudio, unlockAudio } from './audio/audio';
 import { applyResults, loadProgress, saveProgress } from './state/progress';
+import { clearIncoming, readIncoming } from './state/progressCode';
 import { loadSettings, saveSettings, type Settings } from './state/settings';
 
 type Mode = 'explore' | 'memorize' | 'progress';
 
 export default function App() {
-  const [mode, setMode] = useState<Mode>('explore');
+  // 진도 링크로 들어왔으면 진도 탭에서 확인부터 받는다
+  const [incoming, setIncoming] = useState(readIncoming);
+  const [mode, setMode] = useState<Mode>(() => (incoming ? 'progress' : 'explore'));
   const [progress, setProgress] = useState(loadProgress);
   const [settings, setSettings] = useState(loadSettings);
 
@@ -27,6 +30,32 @@ export default function App() {
       saveProgress(next);
       return next;
     });
+  }, []);
+
+  // 이미 열어둔 창에 링크를 붙여넣으면 해시만 바뀌고 리로드는 안 된다 — 그때도 받아준다
+  useEffect(() => {
+    const onHash = () => {
+      const inc = readIncoming();
+      if (!inc) return;
+      setIncoming(inc);
+      setMode('progress');
+    };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
+  // 주소에 남은 코드는 즉시 지운다 — 새로고침할 때마다 다시 묻지 않게
+  const acceptIncoming = useCallback(() => {
+    if (!incoming) return;
+    saveProgress(incoming);
+    setProgress(incoming);
+    setIncoming(null);
+    clearIncoming();
+  }, [incoming]);
+
+  const dismissIncoming = useCallback(() => {
+    setIncoming(null);
+    clearIncoming();
   }, []);
 
   const changeSettings = useCallback((s: Settings) => {
@@ -67,7 +96,14 @@ export default function App() {
       {mode === 'memorize' && (
         <MemorizeView store={progress} onFinish={recordSession} settings={settings} />
       )}
-      {mode === 'progress' && <ProgressView store={progress} />}
+      {mode === 'progress' && (
+        <ProgressView
+          store={progress}
+          incoming={incoming}
+          onAcceptIncoming={acceptIncoming}
+          onDismissIncoming={dismissIncoming}
+        />
+      )}
     </div>
   );
 }
