@@ -4,6 +4,7 @@ import { placeVoicing, LOWEST_MIN, LOWEST_MAX } from '../placement';
 import { buildProgression, placeProgression, PROGRESSIONS } from '../progressions';
 import { keyName, notePc, spellInterval, spellVoicing, toGlyphs, MAJOR_KEYS, MINOR_KEYS } from '../spelling';
 import { allItems, contextsFor, itemId, parseItemId } from '../items';
+import { chordSymbol } from '../format';
 import type { Form, ProgressionType } from '../types';
 
 const FORMS: Form[] = ['A', 'B'];
@@ -200,6 +201,27 @@ describe('음이름 표기', () => {
   });
 });
 
+describe('코드 심볼 표기 (문맥 기준)', () => {
+  it('같은 m7 보이싱이 메이저 ii는 Dm7, 마이너 i는 Cm9', () => {
+    expect(chordSymbol(...symbolArgs(0, 'major', 0))).toBe('Dm7');
+    expect(chordSymbol(...symbolArgs(0, 'minor', 2))).toBe('Cm9');
+  });
+
+  it('스펙 §2 검산 표기와 일치', () => {
+    expect(labels(0, 'major')).toEqual(['Dm7', 'G7', 'Cmaj7']);
+    expect(labels(0, 'minor')).toEqual(['Dm7♭5', 'G7♭9', 'Cm9']);
+    expect(labels(1, 'major')).toEqual(['E♭m7', 'A♭7', 'D♭maj7']);
+  });
+
+  function labels(keyPc: number, type: ProgressionType): string[] {
+    return buildProgression(keyPc, type, 'A').map((c) => chordSymbol(c.rootName, c.symbol));
+  }
+  function symbolArgs(keyPc: number, type: ProgressionType, slot: number): [string, string] {
+    const c = buildProgression(keyPc, type, 'A')[slot];
+    return [c.rootName, c.symbol];
+  }
+});
+
 describe('items', () => {
   it('고유 item 120개', () => {
     const items = allItems();
@@ -214,13 +236,17 @@ describe('items', () => {
 
   it('m7만 문맥이 두 개 (메이저 ii / 마이너 i) — 의도된 동작', () => {
     expect(contextsFor(2, 'm7')).toEqual([
-      { type: 'major', keyPc: 0, roman: 'ii' },
-      { type: 'minor', keyPc: 2, roman: 'i' },
+      { type: 'major', keyPc: 0, roman: 'ii', symbol: 'm7' },
+      { type: 'minor', keyPc: 2, roman: 'i', symbol: 'm9' },
     ]);
-    expect(contextsFor(7, 'dom7')).toEqual([{ type: 'major', keyPc: 0, roman: 'V' }]);
-    expect(contextsFor(0, 'maj7')).toEqual([{ type: 'major', keyPc: 0, roman: 'I' }]);
-    expect(contextsFor(2, 'm7b5')).toEqual([{ type: 'minor', keyPc: 0, roman: 'ii∅' }]);
-    expect(contextsFor(7, 'dom7b9')).toEqual([{ type: 'minor', keyPc: 0, roman: 'V' }]);
+    expect(contextsFor(7, 'dom7')).toEqual([{ type: 'major', keyPc: 0, roman: 'V', symbol: '7' }]);
+    expect(contextsFor(0, 'maj7')).toEqual([{ type: 'major', keyPc: 0, roman: 'I', symbol: 'maj7' }]);
+    expect(contextsFor(2, 'm7b5')).toEqual([
+      { type: 'minor', keyPc: 0, roman: 'ii∅', symbol: 'm7b5' },
+    ]);
+    expect(contextsFor(7, 'dom7b9')).toEqual([
+      { type: 'minor', keyPc: 0, roman: 'V', symbol: '7b9' },
+    ]);
   });
 
   it('문맥의 진행에서 해당 슬롯 quality가 item quality와 일치한다', () => {

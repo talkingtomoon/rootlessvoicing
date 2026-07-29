@@ -57,6 +57,12 @@
 정답 표시는 항상 canonical 하나로 보여준다. 옥타브 단위 이동은 전체가 함께 이동한 것만 인정
 (일부 성부만 이동하면 오답).
 
+### 코드 심볼 표기
+
+접미사는 quality가 아니라 **진행 슬롯(문맥)** 이 정한다 (`ProgressionSlot.symbol` / `ItemContext.symbol`).
+같은 m7 보이싱이 메이저 ii에서는 `Dm7`, 마이너 i에서는 `Cm9`다 — 스펙 §2 검산 표기와 일치.
+`chordSymbol(rootName, symbol)`은 접미사를 받기만 하고 quality를 보지 않는다.
+
 ### 음이름 표기
 
 조성 기준. 철자는 **도수 기반**으로 계산한다(`spelling.ts`): 목표 글자 = 루트 글자 + (도수-1),
