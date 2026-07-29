@@ -3,7 +3,7 @@ import { getVoicing, QUALITIES } from '../voicings';
 import { placeVoicing, LOWEST_MIN, LOWEST_MAX } from '../placement';
 import { buildProgression, placeProgression, PROGRESSIONS } from '../progressions';
 import { keyName, notePc, spellInterval, spellVoicing, toGlyphs, ROOT_NAMES } from '../spelling';
-import { allItems, contextsFor, itemId, parseItemId } from '../items';
+import { allItems, contextsFor, itemId, itemsOf, parseItemId } from '../items';
 import { chordSymbol } from '../format';
 import type { Form, ProgressionType } from '../types';
 
@@ -217,6 +217,20 @@ describe('items', () => {
     const items = allItems();
     expect(items).toHaveLength(120);
     expect(new Set(items.map(itemId)).size).toBe(120);
+  });
+
+  it('itemsOf: 한 quality × form은 12루트 정확히 한 바퀴', () => {
+    for (const quality of QUALITIES) {
+      for (const form of FORMS) {
+        const items = itemsOf(quality, form);
+        expect(items).toHaveLength(12);
+        expect(items.map((i) => i.rootPc).sort((a, b) => a - b)).toEqual([...Array(12).keys()]);
+        expect(items.every((i) => i.quality === quality && i.form === form)).toBe(true);
+        // allItems()의 부분집합이어야 한다 (같은 item 식별자 체계)
+        const all = new Set(allItems().map(itemId));
+        expect(items.every((i) => all.has(itemId(i)))).toBe(true);
+      }
+    }
   });
 
   it('itemId 왕복', () => {

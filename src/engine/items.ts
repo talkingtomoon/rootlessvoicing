@@ -32,6 +32,11 @@ export function allItems(): Item[] {
   return items;
 }
 
+/** 한 quality × form의 12루트 — 타입별 암기 모드의 출제 단위 */
+export function itemsOf(quality: ChordQuality, form: Form): Item[] {
+  return Array.from({ length: 12 }, (_, rootPc) => ({ rootPc, quality, form }));
+}
+
 export type ItemContext = {
   type: ProgressionType;
   keyPc: number;
