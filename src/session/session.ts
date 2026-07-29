@@ -1,5 +1,6 @@
 import type { Item, ItemContext, ItemId } from '../engine/items';
 import { contextsFor, itemId } from '../engine/items';
+import { shuffle } from '../lib/shuffle';
 
 /**
  * 보관함 루프 (스펙 §5).
@@ -32,23 +33,6 @@ export type Session = {
 };
 
 export const SESSION_SIZES = [12, 30, 60, 120] as const;
-
-function shuffle<T>(arr: T[], rand: () => number): T[] {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-/**
- * 출제 목록 뽑기. Phase 4에서 Leitner 우선순위(간격 지난 것 → 신규 → 낮은 단계)로 교체 예정.
- * 지금은 무작위 표본.
- */
-export function drawSessionItems(all: Item[], n: number, rand: () => number): Item[] {
-  return shuffle(all, rand).slice(0, Math.min(n, all.length));
-}
 
 export function createSession(items: Item[], startedAt: number, rand: () => number): Session {
   const cards: SessionCard[] = shuffle(items, rand).map((item) => {

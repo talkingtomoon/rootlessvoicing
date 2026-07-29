@@ -1,18 +1,29 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ExploreView } from './views/ExploreView';
 import { MemorizeView } from './views/MemorizeView';
+import { ProgressView } from './views/ProgressView';
 import { initAudio, unlockAudio } from './audio/audio';
+import { applyResults, loadProgress, saveProgress } from './state/progress';
 
-type Mode = 'explore' | 'memorize';
+type Mode = 'explore' | 'memorize' | 'progress';
 
 export default function App() {
   const [mode, setMode] = useState<Mode>('explore');
+  const [progress, setProgress] = useState(loadProgress);
 
   useEffect(() => {
     void initAudio(); // 샘플 버퍼 미리 다운로드 (첫 클릭 렉 방지)
     const unlock = () => void unlockAudio();
     window.addEventListener('pointerdown', unlock, { once: true });
     return () => window.removeEventListener('pointerdown', unlock);
+  }, []);
+
+  const recordSession = useCallback((firstTry: Record<string, boolean>) => {
+    setProgress((prev) => {
+      const next = applyResults(prev, firstTry);
+      saveProgress(next);
+      return next;
+    });
   }, []);
 
   return (
@@ -24,6 +35,7 @@ export default function App() {
             [
               ['explore', '탐색'],
               ['memorize', '암기'],
+              ['progress', '진도'],
             ] as [Mode, string][]
           ).map(([m, label]) => (
             <button
@@ -38,7 +50,9 @@ export default function App() {
           ))}
         </nav>
       </header>
-      {mode === 'explore' ? <ExploreView /> : <MemorizeView />}
+      {mode === 'explore' && <ExploreView />}
+      {mode === 'memorize' && <MemorizeView store={progress} onFinish={recordSession} />}
+      {mode === 'progress' && <ProgressView store={progress} />}
     </div>
   );
 }

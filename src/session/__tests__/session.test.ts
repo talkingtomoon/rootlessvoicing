@@ -4,7 +4,6 @@ import { contextsFor, itemId } from '../../engine/items';
 import {
   answerCurrent,
   createSession,
-  drawSessionItems,
   remaining,
   summarize,
   type Session,
@@ -22,15 +21,6 @@ function card(rootPc: number, quality: Item['quality'] = 'maj7', form: Item['for
 function ids(cards: SessionCard[]): string[] {
   return cards.map((c) => itemId(c.item));
 }
-
-describe('drawSessionItems', () => {
-  it('중복 없이 n개, n이 전체보다 크면 전체', () => {
-    const drawn = drawSessionItems(allItems(), 30, Math.random);
-    expect(drawn).toHaveLength(30);
-    expect(new Set(drawn.map(itemId)).size).toBe(30);
-    expect(drawSessionItems(allItems(), 999, Math.random)).toHaveLength(120);
-  });
-});
 
 describe('보관함 루프', () => {
   it('생성: total = N, 남은 카드 = N, current 존재', () => {

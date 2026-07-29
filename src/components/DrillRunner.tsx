@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { allItems, itemId, type Item } from '../engine/items';
 import { gradeAttempt } from '../engine/grading';
 import { ROOT_NAMES, toGlyphs } from '../engine/spelling';
@@ -16,6 +16,8 @@ type Props = {
   draw: () => Item[];
   /** 나가기 / 세션 종료 후 시작 화면으로 */
   onExit: () => void;
+  /** 세션이 끝났을 때 item별 첫 시도 결과를 넘긴다 (Leitner 갱신용). 세션당 한 번만 호출된다. */
+  onFinish?: (firstTry: Record<string, boolean>) => void;
 };
 
 function itemLabel(item: Item): string {
@@ -30,7 +32,7 @@ function findItem(id: string): Item | null {
  * 보관함 루프 실행부 — 암기/타입별 모드가 공유한다.
  * 어떤 item을 낼지는 draw()가 정하고, 여기서는 출제·채점·집계만 한다.
  */
-export function DrillRunner({ draw, onExit }: Props) {
+export function DrillRunner({ draw, onExit, onFinish }: Props) {
   const [session, setSession] = useState<Session>(() =>
     createSession(draw(), Date.now(), Math.random),
   );
@@ -45,6 +47,14 @@ export function DrillRunner({ draw, onExit }: Props) {
     const slotIdx = PROGRESSIONS[card.ctx.type].findIndex((s) => s.roman === card.ctx.roman);
     return buildProgression(card.ctx.keyPc, card.ctx.type, card.item.form)[slotIdx];
   }, [session.current]);
+
+  // 세션이 끝나면 진도를 한 번만 기록한다 (StrictMode 이중 실행 방지용 ref 가드)
+  const recorded = useRef<Session | null>(null);
+  useEffect(() => {
+    if (session.current || recorded.current === session) return;
+    recorded.current = session;
+    onFinish?.(session.firstTry);
+  }, [session, onFinish]);
 
   function restart() {
     setSession(createSession(draw(), Date.now(), Math.random));
