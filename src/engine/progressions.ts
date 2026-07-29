@@ -10,31 +10,25 @@ export type ProgressionSlot = {
   /** 키 루트로부터의 반음 수 */
   rootOffset: number;
   quality: ChordQuality;
-  /**
-   * 화면 표기 접미사. quality가 아니라 슬롯이 정한다 —
-   * 같은 m7 보이싱이 메이저 ii에서는 'm7', 마이너 i에서는 'm9'로 불린다 (스펙 §2 검산 표기).
-   */
-  symbol: string;
 };
 
 export const PROGRESSIONS: Record<ProgressionType, ProgressionSlot[]> = {
   major: [
-    { roman: 'ii', rootDegree: '2', rootOffset: 2, quality: 'm7', symbol: 'm7' },
-    { roman: 'V', rootDegree: '5', rootOffset: 7, quality: 'dom7', symbol: '7' },
-    { roman: 'I', rootDegree: '1', rootOffset: 0, quality: 'maj7', symbol: 'maj7' },
+    { roman: 'ii', rootDegree: '2', rootOffset: 2, quality: 'm7' },
+    { roman: 'V', rootDegree: '5', rootOffset: 7, quality: 'dom7' },
+    { roman: 'I', rootDegree: '1', rootOffset: 0, quality: 'maj7' },
   ],
   minor: [
-    { roman: 'ii∅', rootDegree: '2', rootOffset: 2, quality: 'm7b5', symbol: 'm7b5' },
-    { roman: 'V', rootDegree: '5', rootOffset: 7, quality: 'dom7b9', symbol: '7b9' },
-    { roman: 'i', rootDegree: '1', rootOffset: 0, quality: 'm7', symbol: 'm9' },
+    { roman: 'ii∅', rootDegree: '2', rootOffset: 2, quality: 'm7b5' },
+    { roman: 'V', rootDegree: '5', rootOffset: 7, quality: 'dom7b9' },
+    // 마이너 i는 9음을 품지만 표기는 m7로 통일한다 (메이저 ii와 같은 라벨)
+    { roman: 'i', rootDegree: '1', rootOffset: 0, quality: 'm7' },
   ],
 };
 
 export type ProgressionChord = {
   roman: string;
   quality: ChordQuality;
-  /** 이 문맥에서의 표기 접미사 ('m7' / 'm9' / '7b9' ...) */
-  symbol: string;
   form: Form;
   rootName: NoteName;
   rootPc: number;
@@ -55,7 +49,6 @@ export function buildProgression(keyPc: number, type: ProgressionType, form: For
     return {
       roman: slot.roman,
       quality: slot.quality,
-      symbol: slot.symbol,
       form,
       rootName,
       rootPc: notePc(rootName),

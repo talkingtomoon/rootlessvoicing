@@ -36,8 +36,6 @@ export type ItemContext = {
   type: ProgressionType;
   keyPc: number;
   roman: string;
-  /** 이 문맥에서의 코드 심볼 접미사 — 같은 m7이 'm7'(메이저 ii) / 'm9'(마이너 i)로 갈린다 */
-  symbol: string;
 };
 
 /**
@@ -51,12 +49,7 @@ export function contextsFor(rootPc: number, quality: ChordQuality): ItemContext[
   for (const type of ['major', 'minor'] as ProgressionType[]) {
     for (const slot of PROGRESSIONS[type]) {
       if (slot.quality !== quality) continue;
-      out.push({
-        type,
-        keyPc: ((pc - slot.rootOffset) % 12 + 12) % 12,
-        roman: slot.roman,
-        symbol: slot.symbol,
-      });
+      out.push({ type, keyPc: ((pc - slot.rootOffset) % 12 + 12) % 12, roman: slot.roman });
     }
   }
   return out;

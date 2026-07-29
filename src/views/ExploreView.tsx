@@ -121,7 +121,7 @@ export function ExploreView() {
               {keyLabel(keyPc, type)} · {chord.roman}
             </div>
             <div className="mt-1 font-display text-3xl text-ivory sm:text-4xl">
-              {chordSymbol(chord.rootName, chord.symbol)}
+              {chordSymbol(chord.rootName, chord.quality)}
             </div>
           </button>
         ))}

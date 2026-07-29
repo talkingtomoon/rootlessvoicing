@@ -43,7 +43,8 @@ function buildKeys(from: number, to: number): { keys: KeyGeom[]; width: number }
   return { keys, width: wIdx * WW };
 }
 
-export function Keyboard({ from = 48, to = 72, highlights = [], onKeyPress }: Props) {
+/** 기본 범위 F2–C5 = 채점 허용 범위(GRADE_MIN..GRADE_MAX)와 정확히 일치시킨다 */
+export function Keyboard({ from = 41, to = 72, highlights = [], onKeyPress }: Props) {
   const { keys, width } = useMemo(() => buildKeys(from, to), [from, to]);
   const [pressed, setPressed] = useState<number | null>(null);
   const releaseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);

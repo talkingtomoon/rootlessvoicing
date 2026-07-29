@@ -1,13 +1,21 @@
-import type { ProgressionType } from './types';
+import type { ChordQuality, ProgressionType } from './types';
 import { keyName, toGlyphs } from './spelling';
 
 /**
- * 코드 심볼. 접미사는 quality가 아니라 진행 슬롯(문맥)이 정한다 —
- * 같은 m7 보이싱이 메이저 ii에서는 Dm7, 마이너 i에서는 Cm9다.
- * 접미사는 ProgressionSlot.symbol / ItemContext.symbol에서 가져올 것.
+ * 표기 접미사는 quality 하나로 결정된다.
+ * 마이너 i는 9음을 품지만 메이저 ii와 같은 m7로 표기한다 (같은 보이싱 = 같은 라벨).
  */
-export function chordSymbol(rootName: string, symbol: string): string {
-  return toGlyphs(rootName) + toGlyphs(symbol);
+export const QUALITY_SYMBOL: Record<ChordQuality, string> = {
+  m7: 'm7',
+  dom7: '7',
+  maj7: 'maj7',
+  m7b5: 'm7b5',
+  dom7b9: '7b9',
+};
+
+/** 'Db' + 'm7b5' → 'D♭m7♭5' */
+export function chordSymbol(rootName: string, quality: ChordQuality): string {
+  return toGlyphs(rootName) + toGlyphs(QUALITY_SYMBOL[quality]);
 }
 
 /** eyebrow용 키 라벨: 'D♭ major' */
