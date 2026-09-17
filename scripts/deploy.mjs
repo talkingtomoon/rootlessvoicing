@@ -5,9 +5,13 @@
  * 여기서 dist를 통째로 gh-pages에 force push 해야 반영된다 (1~2분 뒤 반영).
  *
  * 원격을 바꾸려면: ROOTLESS_DEPLOY_REMOTE=<url> npm run deploy
+ *
+ * 이전 버전 보존: `site-<이름>` 태그(옛 gh-pages 커밋)마다 그 빌드를 dist/<이름>/ 에 풀어 같이 올린다.
+ * force push로 gh-pages가 덮여도 옛 사이트는 .../rootlessvoicing/<이름>/ 에서 계속 열린다.
+ * 새 버전을 남기려면 배포 전에: git tag site-v2 origin/gh-pages && git push origin site-v2
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 
 const REMOTE =
   process.env.ROOTLESS_DEPLOY_REMOTE ?? 'https://github.com/talkingtomoon/rootlessvoicing.git';
@@ -19,6 +23,22 @@ if (!existsSync(DIST)) {
 }
 
 const git = (...args) => execFileSync('git', args, { cwd: DIST, stdio: 'inherit' });
+
+// 이전 버전들을 하위 폴더로 (태그가 로컬에 없으면 원격에서 받아 온다)
+try {
+  execFileSync('git', ['fetch', '-q', REMOTE, 'refs/tags/site-*:refs/tags/site-*'], { stdio: 'inherit' });
+} catch {
+  console.warn('site-* 태그를 원격에서 못 받았다 — 로컬 태그만 쓴다');
+}
+const siteTags = execFileSync('git', ['tag', '-l', 'site-*'], { encoding: 'utf8' }).split(/\s+/).filter(Boolean);
+for (const tag of siteTags) {
+  const name = tag.slice('site-'.length);
+  const dir = `${DIST}/${name}`;
+  mkdirSync(dir, { recursive: true });
+  const tarball = execFileSync('git', ['archive', '--format=tar', tag], { maxBuffer: 256 * 1024 * 1024 });
+  execFileSync('tar', ['-x', '-f', '-', '-C', dir], { input: tarball });
+  console.log(`이전 버전 ${tag} → ${dir}/`);
+}
 
 // Jekyll 처리를 끄지 않으면 _로 시작하는 파일이 무시될 수 있다
 writeFileSync(`${DIST}/.nojekyll`, '');

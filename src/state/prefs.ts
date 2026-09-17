@@ -59,3 +59,16 @@ export function loadLastExploreMode(): 'progression' | 'type' {
 export function saveLastExploreMode(m: 'progression' | 'type'): void {
   localStorage.setItem(LAST_EXPLORE_MODE_KEY, m);
 }
+
+const INPUT_MODE_KEY = 'rootless:inputMode';
+
+/** 오늘 연습의 입력 방식 — tap: 화면 건반에 순서대로, piano: 실제 피아노로 치고 자가채점 */
+export type InputMode = 'tap' | 'piano';
+
+export function loadInputMode(): InputMode {
+  return localStorage.getItem(INPUT_MODE_KEY) === 'piano' ? 'piano' : 'tap';
+}
+
+export function saveInputMode(m: InputMode): void {
+  localStorage.setItem(INPUT_MODE_KEY, m);
+}

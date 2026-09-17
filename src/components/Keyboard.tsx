@@ -15,6 +15,8 @@ type Props = {
   to?: number;
   highlights?: KeyHighlight[];
   onKeyPress?: (midi: number) => void;
+  /** false면 좁은 화면에서도 페이징하지 않고 범위 전체를 한 번에 그린다 (짧은 범위 전용) */
+  paged?: boolean;
 };
 
 const WHITE_PCS = [0, 2, 4, 5, 7, 9, 11];
@@ -48,10 +50,10 @@ function buildKeys(from: number, to: number): { keys: KeyGeom[]; width: number }
 const PAGE_SPAN = 12;
 
 /** 기본 범위 F2–C5 = 채점 허용 범위(GRADE_MIN..GRADE_MAX)와 정확히 일치시킨다 */
-export function Keyboard({ from = 41, to = 72, highlights = [], onKeyPress }: Props) {
+export function Keyboard({ from = 41, to = 72, highlights = [], onKeyPress, paged = true }: Props) {
   const [pressed, setPressed] = useState<number | null>(null);
   const releaseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const narrow = useMediaQuery(NARROW);
+  const narrow = useMediaQuery(NARROW) && paged;
 
   // 모바일 세로: 스크롤 대신 한 옥타브씩 페이징한다 (스펙 §8)
   const maxAnchor = to - PAGE_SPAN;

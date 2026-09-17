@@ -7,6 +7,7 @@ import { QUALITIES } from '../engine/voicings';
 import { QUALITY_SYMBOL } from '../engine/format';
 import { ROOT_NAMES, toGlyphs } from '../engine/spelling';
 import { DrillRunner } from '../components/DrillRunner';
+import { studyDay } from '../state/day';
 import { Seg } from '../components/Seg';
 import { SESSION_SIZES } from '../session/session';
 import {
@@ -48,7 +49,7 @@ export function MemorizeView({ store, onFinish, settings }: Props) {
   const counts = useMemo(() => {
     const m: Record<number, number> = {};
     for (const size of SESSION_SIZES) {
-      m[size] = selectItems(store, pool, size, Math.random).length;
+      m[size] = selectItems(store, pool, size, Math.random, studyDay()).length;
     }
     return m;
   }, [store, pool]);
@@ -89,7 +90,7 @@ export function MemorizeView({ store, onFinish, settings }: Props) {
       <DrillRunner
         draw={
           mode === 'all'
-            ? () => selectItems(store, pool, n, Math.random)
+            ? () => selectItems(store, pool, n, Math.random, studyDay())
             : () => itemsOf(quality, form)
         }
         allowedTypes={types}

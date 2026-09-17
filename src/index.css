@@ -68,3 +68,25 @@ kbd {
 svg[aria-label='건반'] {
   touch-action: manipulation;
 }
+
+/* 폰: 탭 하이라이트·더블탭 확대·당겨서 튕김을 끈다 — 빠르게 연타하는 화면이라 */
+html {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+button {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+body {
+  overscroll-behavior-y: none;
+}
+
+/* 오늘 연습 화면: 노치·홈 인디케이터를 피한다 (홈 화면 앱은 viewport-fit=cover) */
+.daily-shell {
+  padding-top: env(safe-area-inset-top);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  height: 100dvh;
+}

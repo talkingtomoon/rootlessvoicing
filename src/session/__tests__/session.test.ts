@@ -61,6 +61,7 @@ describe('보관함 루프', () => {
       current: a,
       recent: [itemId(a.item), itemId(b.item)],
       firstTry: {},
+      firstSlow: {},
       misses: {},
       total: 3,
       startedAt: 0,

@@ -15,9 +15,15 @@ export type ItemProgress = {
 };
 
 export type ProgressStore = {
-  /** 완료한 세션 수. 다음 세션 번호는 session + 1 */
+  /** 완료한 세션 수. 다음 세션 번호는 session + 1 (같은 학습일이면 session 그대로 — nextSessionNo) */
   session: number;
   items: Record<ItemId, ItemProgress>;
+  /**
+   * 마지막으로 기록한 학습일 (studyDay, 'YYYY-MM-DD'). 있으면 같은 날의 여러 판은 한 세션으로 친다 —
+   * 매일 15분을 몇 판으로 나눠 해도 간격(1/2/4/8/16)이 "학습일" 단위로 유지된다.
+   * 진도 링크에는 실리지 않는다 (가져온 뒤 첫 기록은 새 세션이 된다).
+   */
+  lastDay?: string;
 };
 
 export const MAX_LEVEL = 5;
@@ -48,6 +54,16 @@ export function saveProgress(store: ProgressStore): void {
   localStorage.setItem(KEY, JSON.stringify(store));
 }
 
+/** 다음(또는 오늘 진행 중인) 세션 번호. day를 주면 같은 학습일은 같은 번호 */
+export function nextSessionNo(store: ProgressStore, day?: string): number {
+  return day !== undefined && store.lastDay === day ? store.session : store.session + 1;
+}
+
+/** 오늘(이 학습일) 이미 채점에 반영된 항목인가 */
+export function seenToday(store: ProgressStore, id: ItemId, day: string): boolean {
+  return store.lastDay === day && store.items[id]?.lastSeenSession === store.session;
+}
+
 /** 이 항목이 재출제 간격을 지났는가 */
 export function isDue(p: ItemProgress, sessionNo: number): boolean {
   return sessionNo - p.lastSeenSession >= LEITNER_INTERVALS[p.level - 1];
@@ -63,8 +79,9 @@ export function selectItems(
   all: Item[],
   n: number,
   rand: () => number,
+  day?: string,
 ): Item[] {
-  const sessionNo = store.session + 1;
+  const sessionNo = nextSessionNo(store, day);
   const rows = all.map((item) => ({ item, p: store.items[itemId(item)] }));
 
   const due = rows.filter((r) => r.p && isDue(r.p, sessionNo));
@@ -101,22 +118,43 @@ export function selectItems(
   return picked;
 }
 
+export type ApplyOptions = {
+  /** 학습일. 주면 같은 날의 판들은 한 세션으로 묶이고, 그날 이미 채점된 항목은 다시 올리거나 내리지 않는다 */
+  day?: string;
+  /** 첫 시도에 맞혔지만 느렸던 항목 — 단계를 유지한다 (올리지도 내리지도 않음) */
+  slow?: Record<ItemId, boolean>;
+  /** 오늘 처음 배운 항목 — 방금 보고 맞힌 것이라 결과와 무관하게 단계 1(내일 복습)로 둔다 */
+  introduced?: ItemId[];
+};
+
 /**
  * 세션 종료 갱신. 첫 시도에 맞혔으면 단계 +1, 아니면 단계 1로.
  * (보관함에서 나중에 맞힌 건 올리지 않는다 — firstTry만 본다.)
  * 미학습 항목은 단계 1에서 시작하므로 첫 시도 정답이면 2, 오답이면 1이 된다.
+ * 느린 정답(slow)은 단계 유지, 오늘 배운 항목(introduced)은 단계 1.
  */
 export function applyResults(
   store: ProgressStore,
   firstTry: Record<ItemId, boolean>,
+  opts: ApplyOptions = {},
 ): ProgressStore {
-  const sessionNo = store.session + 1;
+  const { day, slow = {}, introduced = [] } = opts;
+  const sessionNo = nextSessionNo(store, day);
   const items = { ...store.items };
   for (const [id, ok] of Object.entries(firstTry)) {
-    const level = ok ? Math.min(MAX_LEVEL, (items[id]?.level ?? 1) + 1) : 1;
+    const prev = items[id];
+    // 같은 학습일에 두 번째로 나온 건 연습일 뿐 — 첫 결과가 그날의 기록이다
+    if (day !== undefined && store.lastDay === day && prev?.lastSeenSession === sessionNo) continue;
+    let level: number;
+    if (!ok) level = 1;
+    else if (introduced.includes(id)) level = 1;
+    else if (slow[id]) level = prev?.level ?? 1;
+    else level = Math.min(MAX_LEVEL, (prev?.level ?? 1) + 1);
     items[id] = { level, lastSeenSession: sessionNo };
   }
-  return { session: sessionNo, items };
+  const next: ProgressStore = { session: sessionNo, items };
+  if (day !== undefined) next.lastDay = day;
+  return next;
 }
 
 /** 히트맵용 조회 — 미학습이면 null */

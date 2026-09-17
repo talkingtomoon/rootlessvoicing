@@ -27,6 +27,8 @@ export type Session = {
   recent: ItemId[];
   /** item별 첫 시도 결과 — Leitner 갱신과 정답률 계산의 근거 */
   firstTry: Record<ItemId, boolean>;
+  /** 첫 시도에 맞혔지만 느렸던 item — Leitner에서 단계를 올리지 않는다 */
+  firstSlow: Record<ItemId, boolean>;
   /** item별 누적 오답 수 */
   misses: Record<ItemId, number>;
   total: number;
@@ -58,6 +60,7 @@ export function createSession(
     current: current ?? null,
     recent: current ? [itemId(current.item)] : [],
     firstTry: {},
+    firstSlow: {},
     misses: {},
     total: cards.length,
     startedAt,
@@ -69,24 +72,30 @@ export function remaining(s: Session): number {
   return s.queue.length + s.retry.length + (s.current ? 1 : 0);
 }
 
-/** 현재 카드에 답하고 다음 카드로. current가 null이 되면 세션 종료. */
-export function answerCurrent(s: Session, correct: boolean): Session {
+/**
+ * 현재 카드에 답하고 다음 카드로. current가 null이 되면 세션 종료.
+ * slow = 맞혔지만 느림. 첫 시도에서만 보관함에 한 번 더 넣는다 (느린 카드가 끝없이 돌지 않게).
+ */
+export function answerCurrent(s: Session, correct: boolean, slow = false): Session {
   if (!s.current) return s;
   const card = s.current;
   const id = itemId(card.item);
+  const isFirst = !(id in s.firstTry);
 
-  const firstTry = id in s.firstTry ? s.firstTry : { ...s.firstTry, [id]: correct };
+  const firstTry = isFirst ? { ...s.firstTry, [id]: correct } : s.firstTry;
+  const firstSlow = isFirst && correct && slow ? { ...s.firstSlow, [id]: true } : s.firstSlow;
   const misses = correct ? s.misses : { ...s.misses, [id]: (s.misses[id] ?? 0) + 1 };
+  const again = !correct || (slow && isFirst);
 
   let queue = [...s.queue];
-  let retry = correct ? [...s.retry] : [...s.retry, card];
+  let retry = again ? [...s.retry, card] : [...s.retry];
   if (queue.length === 0) {
     // 목록이 비면 보관함을 다시 돈다
     queue = retry;
     retry = [];
   }
   if (queue.length === 0) {
-    return { ...s, queue, retry, current: null, firstTry, misses };
+    return { ...s, queue, retry, current: null, firstTry, firstSlow, misses };
   }
 
   // 최근 2문제 안에 나온 카드는 피한다 (대안이 없으면 첫 카드)
@@ -103,6 +112,7 @@ export function answerCurrent(s: Session, correct: boolean): Session {
     current,
     recent: [itemId(current.item), ...s.recent].slice(0, 4),
     firstTry,
+    firstSlow,
     misses,
   };
 }
