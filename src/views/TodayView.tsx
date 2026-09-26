@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { itemId, type Item } from '../engine/items';
-import { chordSymbol, keyLabel } from '../engine/format';
+import { chordSymbol, QUALITY_SYMBOL } from '../engine/format';
 import { ROOT_NAMES, toGlyphs } from '../engine/spelling';
 import { applyResults, type ProgressStore } from '../state/progress';
 import { enabledForms, enabledItems, enabledTypes, type Settings } from '../state/settings';
@@ -25,15 +25,14 @@ import {
   shouldIntroduce,
   unitState,
   UNIT_FORMS,
-  UNIT_TYPES,
   type Unit,
 } from '../session/daily';
+import { QUALITIES } from '../engine/voicings';
 import { DailyShell } from '../components/DailyShell';
 import { clock } from '../lib/clock';
 import { LessonIntro } from '../components/LessonIntro';
 import { RoundRunner, type RoundResult } from '../components/RoundRunner';
 import { Seg } from '../components/Seg';
-import { FOURTHS_ORDER } from '../engine/chord';
 
 type Props = {
   store: ProgressStore;
@@ -104,7 +103,8 @@ export function TodayView({ store, onStoreChange, settings }: Props) {
     (s: ProgressStore) => {
       const unitsToday = loadUnitsToday(day);
       if (shouldIntroduce(s, pool, units, day, unitsToday)) {
-        const nu = nextUnit(s, units)!;
+        // 기둥(앞 코드·메이저 짝·A형)이 선 유닛을 고른다
+        const nu = nextUnit(s, units, pool)!;
         setPlan({ unit: nu.unit, fresh: nu.fresh, items: planRound(s, pool, day, nu.fresh) });
         setStage('intro');
       } else {
@@ -296,7 +296,7 @@ export function TodayView({ store, onStoreChange, settings }: Props) {
 
   // ── 홈 ───────────────────────────────────────────────────
   const due = dueToday(store, pool, day).length;
-  const nu = nextUnit(store, units);
+  const nu = nextUnit(store, units, pool);
   const date = dayToDate(day);
   const pct = Math.min(1, todaySec / DAILY_GOAL_SEC);
   const doneToday = todaySec >= DAILY_GOAL_SEC;
@@ -326,14 +326,7 @@ export function TodayView({ store, onStoreChange, settings }: Props) {
 
       <div className="flex flex-col gap-2 rounded-2xl border border-line bg-felt-deep p-4">
         <Row label="복습" value={due > 0 ? `${due}장` : '없음'} />
-        <Row
-          label="새로"
-          value={
-            nu
-              ? `${keyLabel(nu.unit.keyPc, nu.unit.type)} ii–V–${nu.unit.type === 'major' ? 'I' : 'i'} · ${nu.unit.form}형`
-              : '코스 다 배움 — 복습만'
-          }
-        />
+        <Row label="새로" value={nu ? unitLabel(nu.unit) : '코스 다 배움 · 복습만'} />
       </div>
 
       <div className="flex flex-col gap-3">
@@ -377,6 +370,12 @@ export function TodayView({ store, onStoreChange, settings }: Props) {
       </a>
     </div>
   );
+}
+
+/** 유닛 한 줄 요약: "Dm7 Gm7 Cm7 · A형" — 무슨 모양을 어느 루트로 도는지 */
+function unitLabel(unit: Unit): string {
+  const chords = unit.items.map((it) => chordSymbol(ROOT_NAMES[it.rootPc], it.quality)).join(' ');
+  return `${chords} · ${unit.form}형`;
 }
 
 function Row({ label, value }: { label: string; value: string }) {
@@ -425,52 +424,52 @@ function Week({ log, day }: { log: TimeLog; day: string }) {
   );
 }
 
-const ROW_LABEL: Record<string, string> = {
-  'A:major': 'A형 메이저',
-  'A:minor': 'A형 마이너',
-  'B:major': 'B형 메이저',
-  'B:minor': 'B형 마이너',
-};
-
-/** 코스 지도: 폼×진행 네 줄 × 4도권 12키. 칸 = 유닛 (다 배움 / 일부 / 다음) */
+/**
+ * 코스 지도: 줄 하나 = 폼 × quality(한 모양), 칸 하나 = 유닛(세 루트).
+ * 칸 색이 진할수록 다 배운 것. 다음에 배울 칸은 테두리로 표시한다.
+ */
 function CourseMap({ store, units, next }: { store: ProgressStore; units: Unit[]; next: Unit | null }) {
+  const rows = UNIT_FORMS.flatMap((form) =>
+    QUALITIES.map((quality) => ({
+      form,
+      quality,
+      units: units.filter((u) => u.form === form && u.quality === quality),
+    })),
+  ).filter((r) => r.units.length > 0);
+
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2">
       <div className="text-xs tracking-widest text-muted">코스</div>
-      {UNIT_FORMS.flatMap((form) =>
-        UNIT_TYPES.map((type) => {
-          const row = FOURTHS_ORDER.map((k) => units.find((u) => u.form === form && u.type === type && u.keyPc === k));
-          if (row.every((u) => !u)) return null;
-          return (
-            <div key={`${form}:${type}`}>
-              <div className="mb-1 text-[11px] text-muted">{ROW_LABEL[`${form}:${type}`]}</div>
-              <div className="grid grid-cols-12 gap-1">
-                {row.map((u, i) => {
-                  if (!u) return <span key={i} />;
-                  const st = unitState(store, u);
-                  const isNext = next === u;
-                  return (
-                    <span
-                      key={i}
-                      className={`flex h-7 items-center justify-center rounded-md text-[10px] ${
-                        st === 'done'
-                          ? 'bg-brass/80 text-felt-deep'
-                          : st === 'partial'
-                            ? 'bg-brass/30 text-ivory'
-                            : isNext
-                              ? 'border border-brass text-ivory'
-                              : 'border border-line text-muted'
-                      }`}
-                    >
-                      {toGlyphs(ROOT_NAMES[u.keyPc])}
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        }),
-      )}
+      {rows.map((row) => (
+        <div key={`${row.form}:${row.quality}`} className="flex items-center gap-2">
+          <div className="w-20 shrink-0 text-[11px] text-muted">
+            {row.form}형 {toGlyphs(QUALITY_SYMBOL[row.quality])}
+          </div>
+          <div className="grid flex-1 grid-cols-4 gap-1">
+            {row.units.map((u) => {
+              const st = unitState(store, u);
+              const isNext = next === u;
+              return (
+                <span
+                  key={u.keys.join()}
+                  title={unitLabel(u)}
+                  className={`flex h-7 items-center justify-center rounded-md text-[10px] ${
+                    st === 'done'
+                      ? 'bg-brass/80 text-felt-deep'
+                      : st === 'partial'
+                        ? 'bg-brass/30 text-ivory'
+                        : isNext
+                          ? 'border border-brass text-ivory'
+                          : 'border border-line text-muted'
+                  }`}
+                >
+                  {u.items.map((it) => toGlyphs(ROOT_NAMES[it.rootPc])).join(' ')}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

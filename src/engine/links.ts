@@ -77,6 +77,11 @@ export function progressionLinks(keyPc: number, type: ProgressionType, form: For
 /** 마이너 코드의 메이저 짝: m7♭5 ← m7, 7♭9 ← 7 (같은 루트·같은 폼) */
 const MAJOR_SIBLING: Partial<Record<ChordQuality, ChordQuality>> = { m7b5: 'm7', dom7b9: 'dom7' };
 
+/** 같은 루트에서 두 음만 내리면 되는 메이저 짝 (없으면 null) */
+export function majorSiblingOf(quality: ChordQuality): ChordQuality | null {
+  return MAJOR_SIBLING[quality] ?? null;
+}
+
 /** 같은 루트 메이저 짝에서 이 코드로 (없으면 null). 성부 인덱스끼리 짝지어 비교한다. */
 export function siblingLink(rootPc: number, quality: ChordQuality, form: Form): Link | null {
   const sib = MAJOR_SIBLING[quality];
