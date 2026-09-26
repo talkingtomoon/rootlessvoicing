@@ -6,7 +6,7 @@ import { TodayView } from './views/TodayView';
 import { studyDay } from './state/day';
 import { SettingsDrawer } from './components/SettingsDrawer';
 import { initAudio, installAudioUnlock } from './audio/audio';
-import { applyResults, loadProgress, saveProgress, type ProgressStore } from './state/progress';
+import { applyResults, loadProgress, mergeProgress, saveProgress, type ProgressStore } from './state/progress';
 import { clearIncoming, readIncoming } from './state/progressCode';
 import { loadSettings, saveSettings, type Settings } from './state/settings';
 
@@ -55,6 +55,18 @@ export default function App() {
     if (!incoming) return;
     saveProgress(incoming);
     setProgress(incoming);
+    setIncoming(null);
+    clearIncoming();
+  }, [incoming]);
+
+  // 합치기 — 이 기기 진도를 버리지 않는 쪽 (기본 동작)
+  const mergeIncoming = useCallback(() => {
+    if (!incoming) return;
+    setProgress((prev) => {
+      const next = mergeProgress(prev, incoming);
+      saveProgress(next);
+      return next;
+    });
     setIncoming(null);
     clearIncoming();
   }, [incoming]);
@@ -111,6 +123,7 @@ export default function App() {
           store={progress}
           incoming={incoming}
           onAcceptIncoming={acceptIncoming}
+          onMergeIncoming={mergeIncoming}
           onDismissIncoming={dismissIncoming}
           onPasted={setIncoming}
         />

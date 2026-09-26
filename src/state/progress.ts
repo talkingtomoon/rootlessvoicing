@@ -161,3 +161,53 @@ export function applyResults(
 export function levelOf(store: ProgressStore, item: Item): number | null {
   return store.items[itemId(item)]?.level ?? null;
 }
+
+/**
+ * 두 기기의 진도 합치기 (덮어쓰기의 대안).
+ *
+ * 세션 번호는 기기마다 다르므로 **나이**(세션번호 − lastSeenSession)로 환산해 비교한다.
+ * 진도 링크가 절대 번호가 아니라 나이를 싣는 것도 같은 이유다.
+ * - 단계는 **높은 쪽** — 한쪽에서 굳힌 건 굳힌 것이다
+ * - 나이는 **더 밀린 쪽** — 복습이 일찍 돌아오는 쪽으로 기운다 (모르는 걸 안다고 치는 것보다 낫다)
+ * - 한쪽에만 있는 항목은 나이를 지킨 채로 들어온다
+ *
+ * 세션 번호와 학습일은 이 기기 것을 유지한다. 연습 시간 기록(timeLog)은 링크에 없으니 합쳐지지 않는다.
+ */
+function ageOf(store: ProgressStore, p: ItemProgress): number {
+  return Math.max(0, store.session - p.lastSeenSession);
+}
+
+export function mergeProgress(local: ProgressStore, incoming: ProgressStore): ProgressStore {
+  const items: Record<ItemId, ItemProgress> = {};
+  const ids = new Set([...Object.keys(local.items), ...Object.keys(incoming.items)]);
+  for (const id of ids) {
+    const a = local.items[id];
+    const b = incoming.items[id];
+    const level = Math.max(a?.level ?? 0, b?.level ?? 0);
+    const age = Math.max(a ? ageOf(local, a) : 0, b ? ageOf(incoming, b) : 0);
+    items[id] = { level, lastSeenSession: local.session - age };
+  }
+  const next: ProgressStore = { session: local.session, items };
+  if (local.lastDay !== undefined) next.lastDay = local.lastDay;
+  return next;
+}
+
+export type MergeSummary = {
+  /** 이 기기에 없던 항목 */
+  added: number;
+  /** 단계가 올라가는 항목 */
+  raised: number;
+  /** 합친 뒤 학습한 항목 수 */
+  total: number;
+};
+
+export function mergeSummary(local: ProgressStore, incoming: ProgressStore): MergeSummary {
+  let added = 0;
+  let raised = 0;
+  for (const [id, b] of Object.entries(incoming.items)) {
+    const a = local.items[id];
+    if (!a) added++;
+    else if (b.level > a.level) raised++;
+  }
+  return { added, raised, total: Object.keys(mergeProgress(local, incoming).items).length };
+}
