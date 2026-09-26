@@ -364,10 +364,17 @@ export function TodayView({ store, onStoreChange, settings }: Props) {
         </p>
       )}
 
-      {/* 배포 스크립트가 site-v1 태그의 옛 빌드를 ./v1/ 에 같이 올린다 */}
-      <a href="./v1/" className="self-center text-xs text-muted underline-offset-4 hover:underline">
-        이전 버전 (v1)
-      </a>
+      {/* 배포 스크립트가 site-* 태그의 옛 빌드를 하위 폴더로 같이 올린다 */}
+      <p className="self-center text-xs text-muted">
+        이전 버전{' '}
+        <a href="./v1/" className="underline-offset-4 hover:underline">
+          v1
+        </a>{' '}
+        ·{' '}
+        <a href="./v2/" className="underline-offset-4 hover:underline">
+          v2
+        </a>
+      </p>
     </div>
   );
 }
