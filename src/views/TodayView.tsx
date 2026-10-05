@@ -213,7 +213,7 @@ export function TodayView({ store, onStoreChange, degrees, onDegreesChange, sett
     };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
-  }, [stage, store, startNext, close]);
+  }, [stage, store, degrees, startNext, close]);
 
   // ── 연습 화면 (폰 전체를 덮는다) ───────────────────────────
   if (stage === 'intro' && plan?.unit) {
