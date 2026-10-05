@@ -386,6 +386,10 @@ export function TodayView({ store, onStoreChange, settings }: Props) {
         ·{' '}
         <a href="./v2/" className="underline-offset-4 hover:underline">
           v2
+        </a>{' '}
+        ·{' '}
+        <a href="./v3/" className="underline-offset-4 hover:underline">
+          v3
         </a>
       </p>
     </div>
