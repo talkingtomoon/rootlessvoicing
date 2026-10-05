@@ -22,6 +22,42 @@ function ids(cards: SessionCard[]): string[] {
   return cards.map((c) => itemId(c.item));
 }
 
+describe('보관함 — 맞힐 때까지 남는다', () => {
+  it('틀리면 몇 번이든 다시 나온다 (세 번 틀리고 네 번째에 맞혀야 빠진다)', () => {
+    let s = createSession(allItems().slice(0, 3), 0, Math.random);
+    const first = itemId(s.current!.item);
+    for (let i = 0; i < 3; i++) {
+      // 이 카드가 나올 때마다 틀린다
+      while (itemId(s.current!.item) !== first) s = answerCurrent(s, true);
+      s = answerCurrent(s, false);
+      expect(remaining(s), `${i + 1}번째 오답 뒤`).toBeGreaterThan(0);
+    }
+    while (itemId(s.current!.item) !== first) s = answerCurrent(s, true);
+    s = answerCurrent(s, true);
+    const left = [s.current, ...s.queue, ...s.retry].filter(Boolean).map((c) => itemId(c!.item));
+    expect(left).not.toContain(first);
+  });
+
+  it('세션은 보관함이 빌 때까지 끝나지 않는다', () => {
+    let s = createSession(allItems().slice(0, 4), 0, Math.random);
+    for (let i = 0; i < 20; i++) {
+      expect(s.current, `${i}번째`).not.toBeNull();
+      s = answerCurrent(s, false); // 계속 틀린다
+    }
+    expect(remaining(s)).toBeGreaterThanOrEqual(4);
+  });
+
+  it('첫 시도 결과만 진도에 들어간다 — 나중에 맞혀도 firstTry는 false', () => {
+    let s = createSession(allItems().slice(0, 2), 0, Math.random);
+    const id = itemId(s.current!.item);
+    s = answerCurrent(s, false);
+    while (itemId(s.current!.item) !== id) s = answerCurrent(s, true);
+    s = answerCurrent(s, true);
+    expect(s.firstTry[id]).toBe(false);
+    expect(s.misses[id]).toBe(1);
+  });
+});
+
 describe('보관함 루프', () => {
   it('생성: total = N, 남은 카드 = N, current 존재', () => {
     const s = createSession(allItems().slice(0, 12), 1000, Math.random);

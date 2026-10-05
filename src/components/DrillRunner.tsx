@@ -6,10 +6,14 @@ import { buildProgression, PROGRESSIONS } from '../engine/progressions';
 import { chordSymbol, FULL_ADDS_INFO, keyLabel } from '../engine/format';
 import { playChord, playNote } from '../audio/audio';
 import { Keyboard, type KeyHighlight } from './Keyboard';
+import { useEcho } from '../lib/useEcho';
 import { answerCurrent, createSession, remaining, summarize, type Session } from '../session/session';
 
-/** 문제 상태: 입력 중 → (정답 보기) 자가채점 대기 → 채점 완료 */
-type QuizPhase = 'input' | 'reveal' | 'graded';
+/**
+ * 문제 상태: 입력 중 → (정답 보기) 자가채점 대기 → 채점 완료 → [따라 치기] → 다음.
+ * 따라 치기는 **못 맞힌 카드에만** 붙는다 — 방금 제 손으로 맞게 친 카드는 다시 칠 이유가 없다.
+ */
+type QuizPhase = 'input' | 'reveal' | 'graded' | 'echo';
 
 type Props = {
   /** 이번 세션에 낼 item 목록을 뽑는다. '한 판 더'에서 다시 호출된다. */
@@ -53,6 +57,9 @@ export function DrillRunner({ draw, onExit, onFinish }: Props) {
     return buildProgression(card.ctx.keyPc, card.ctx.type, card.item.form)[slotIdx];
   }, [session.current]);
 
+  // 따라 치기 — 전체 건반이라 실제 음높이 그대로 받는다
+  const echo = useEcho(chord?.midi ?? []);
+
   // 세션이 끝나면 진도를 한 번만 기록한다 (StrictMode 이중 실행 방지용 ref 가드)
   const recorded = useRef<Session | null>(null);
   useEffect(() => {
@@ -68,6 +75,7 @@ export function DrillRunner({ draw, onExit, onFinish }: Props) {
     setAutoCorrect(null);
     setUserNotes([]);
     notesRef.current = [];
+    echo.reset();
   }
 
   const reveal = useCallback(() => {
@@ -76,17 +84,22 @@ export function DrillRunner({ draw, onExit, onFinish }: Props) {
     playChord(chord.midi);
   }, [chord]);
 
+  /** 맞혔으면 바로 다음으로 넘길 수 있고, 틀렸으면 따라 치기를 거친다 */
   const grade = useCallback((correct: boolean) => {
     setLastCorrect(correct);
     setAutoCorrect(correct);
-    setPhase('graded');
+    setPhase(correct ? 'graded' : 'echo');
   }, []);
 
   /**
    * 채점 결과 정정. 알고 있었는데 잘못 눌렀을 때 맞음으로 넘긴다.
    * 카드에 반영되는 건 next() 시점이라 여기서는 표시값만 바꾸면 된다.
    */
-  const override = useCallback((correct: boolean) => setLastCorrect(correct), []);
+  const override = useCallback((correct: boolean) => {
+    setLastCorrect(correct);
+    // 알고 있었다면 따라 칠 것도 없다
+    if (correct) setPhase('graded');
+  }, []);
 
   const next = useCallback(() => {
     if (lastCorrect === null) return;
@@ -96,10 +109,22 @@ export function DrillRunner({ draw, onExit, onFinish }: Props) {
     setAutoCorrect(null);
     setUserNotes([]);
     notesRef.current = [];
-  }, [lastCorrect]);
+    echo.reset();
+  }, [lastCorrect, echo]);
+
+  // 따라 치기가 끝나면 바로 다음 문제
+  useEffect(() => {
+    if (phase !== 'echo' || !echo.complete) return;
+    const t = setTimeout(next, 250);
+    return () => clearTimeout(t);
+  }, [phase, echo.complete, next]);
 
   function pressKey(midi: number) {
     playNote(midi);
+    if (phase === 'echo') {
+      echo.press(midi);
+      return;
+    }
     if (phase !== 'input' || !chord) return;
     // 한 프레임 안에 여러 번 눌러도 유실되지 않게 ref로 누적한다 (빠르게 치면 실제로 겹친다)
     const prev = notesRef.current;
@@ -134,10 +159,11 @@ export function DrillRunner({ draw, onExit, onFinish }: Props) {
       } else if (phase === 'reveal' && (e.key === '1' || e.key === '2')) {
         e.preventDefault();
         grade(e.key === '1');
-      } else if (phase === 'graded' && e.key === 'Enter') {
+      } else if ((phase === 'graded' || phase === 'echo') && e.key === 'Enter') {
+        // echo에서의 Enter: 실제 피아노로 따라 치고 넘어가는 길 (키보드만으로도 조작 가능해야 한다)
         e.preventDefault();
         next();
-      } else if (phase === 'graded' && (e.key === '1' || e.key === '2')) {
+      } else if ((phase === 'graded' || phase === 'echo') && (e.key === '1' || e.key === '2')) {
         // 오입력 정정 — 1=맞음, 2=틀림 (자가채점과 같은 손가락)
         e.preventDefault();
         override(e.key === '1');
@@ -209,7 +235,17 @@ export function DrillRunner({ draw, onExit, onFinish }: Props) {
   const card = session.current;
   const revealed = phase !== 'input';
 
-  const highlights: KeyHighlight[] = revealed
+  const echoHl: KeyHighlight[] = chord
+    ? chord.midi.map((midi, i) => ({
+        midi,
+        label: String(i + 1),
+        kind: i < echo.done ? ('user' as const) : ('answer' as const),
+      }))
+    : [];
+
+  const highlights: KeyHighlight[] = phase === 'echo'
+    ? echoHl
+    : revealed
     ? [
         ...chord!.midi.map((midi, i) => ({
           midi,
@@ -279,6 +315,27 @@ export function DrillRunner({ draw, onExit, onFinish }: Props) {
               className="rounded-full border border-line px-4 py-2 text-sm text-ivory-dim hover:border-muted"
             >
               틀렸음 <kbd className="text-muted">2</kbd>
+            </button>
+          </>
+        )}
+        {phase === 'echo' && (
+          <>
+            <span className="text-sm text-crimson">
+              따라 치기 · {echo.done}/{echo.total}
+            </span>
+            <span className="text-sm text-muted">정답을 건반에서 한 번 (아래 음부터)</span>
+            {/* 알고 있었는데 잘못 눌렀을 때 — 따라 칠 것 없이 넘어간다 */}
+            <button
+              onClick={() => override(true)}
+              className="rounded-full border border-line px-4 py-2 text-sm text-ivory-dim hover:border-brass hover:text-ivory"
+            >
+              알고 있었음 <kbd className="text-muted">1</kbd>
+            </button>
+            <button
+              onClick={next}
+              className="rounded-full border border-line px-4 py-2 text-sm text-muted hover:text-ivory-dim"
+            >
+              피아노로 쳤음 <kbd>Enter</kbd>
             </button>
           </>
         )}

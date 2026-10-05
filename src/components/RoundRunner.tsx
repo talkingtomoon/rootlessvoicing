@@ -10,6 +10,7 @@ import { FAST_MS } from '../session/daily';
 import type { InputMode } from '../state/prefs';
 import { Keyboard, type KeyHighlight } from './Keyboard';
 import { LinkLines } from './LinkLines';
+import { useEcho } from '../lib/useEcho';
 
 /** 판 하나의 결과 — 오늘 요약과 진도 갱신에 쓴다 */
 export type RoundResult = {
@@ -44,7 +45,11 @@ export function RoundRunner({ items, mode, freshIds, onFinish, onRemaining }: Pr
   const [session, setSession] = useState<Session>(() =>
     createSession(items, Date.now(), Math.random),
   );
-  type Phase = 'input' | 'reveal' | 'graded';
+  /**
+   * input → (reveal) → graded → [echo] → 다음 카드.
+   * echo = 따라 치기. **못 맞힌 카드에만 붙인다** — 방금 제 손으로 맞게 친 카드는 다시 칠 이유가 없다.
+   */
+  type Phase = 'input' | 'reveal' | 'graded' | 'echo';
   const [phase, setPhase] = useState<Phase>('input');
   const [pcs, setPcs] = useState<number[]>([]);
   const pcsRef = useRef<number[]>([]);
@@ -59,6 +64,8 @@ export function RoundRunner({ items, mode, freshIds, onFinish, onRemaining }: Pr
     () => (card ? buildChord(card.item.rootPc, card.item.quality, card.item.form) : null),
     [card],
   );
+  // 따라 치기 — 화면 건반은 pitch class로 받는다 (입력과 같은 한 옥타브 패드)
+  const echo = useEcho(chord?.midi ?? [], true);
 
   useEffect(() => {
     onRemaining(remaining(session));
@@ -101,7 +108,21 @@ export function RoundRunner({ items, mode, freshIds, onFinish, onRemaining }: Pr
     pcsRef.current = [];
     setResult(null);
     setCorrected(false);
-  }, [result]);
+    echo.reset();
+  }, [result, echo]);
+
+  /** 못 맞힌 카드는 정답을 보고 한 번 따라 친 뒤에 넘어간다 */
+  const afterGrade = useCallback((r: { correct: boolean; slow: boolean; ms: number }) => {
+    setResult(r);
+    setPhase(r.correct ? 'graded' : 'echo');
+  }, []);
+
+  // 따라 치기가 끝나면 바로 다음 문제
+  useEffect(() => {
+    if (phase !== 'echo' || !echo.complete) return;
+    const t = setTimeout(next, 250);
+    return () => clearTimeout(t);
+  }, [phase, echo.complete, next]);
 
   // 맞히면 잠깐 정답을 보여주고 저절로 넘어간다 — 리듬이 끊기지 않게. 틀리면 직접 넘긴다.
   useEffect(() => {
@@ -129,9 +150,14 @@ export function RoundRunner({ items, mode, freshIds, onFinish, onRemaining }: Pr
       const correct = gradeSequence(seq, chord.midi);
       recordMs(ms);
       playChord(chord.midi);
-      setResult({ correct, slow: correct && ms > FAST_MS.tap, ms });
-      setPhase('graded');
+      afterGrade({ correct, slow: correct && ms > FAST_MS.tap, ms });
     }
+  }
+
+  /** 따라 치기 중의 건반 입력 — 맞는 음만 세고 틀린 음은 소리만 난다 */
+  function echoKey(midi: number) {
+    playNote(chord ? stackAscending([midi % 12], chord.midi[0] - (chord.midi[0] % 12))[0] : midi);
+    echo.press(midi);
   }
 
   function backspace() {
@@ -148,28 +174,44 @@ export function RoundRunner({ items, mode, freshIds, onFinish, onRemaining }: Pr
     recordMs(ms);
     playChord(chord.midi);
     if (mode === 'tap') {
-      setResult({ correct: false, slow: false, ms });
-      setPhase('graded');
+      afterGrade({ correct: false, slow: false, ms }); // 모르겠음도 따라 치기로 간다
     } else {
       setResult({ correct: false, slow: false, ms });
       setPhase('reveal');
     }
   }
 
-  /** piano 자가채점: 채점과 동시에 다음 카드로 */
+  /**
+   * piano 자가채점. 맞힌 건 바로 다음 카드로, 틀린 건 따라 치기를 거친다.
+   * 피아노로 치는 사람은 실제 건반에서 따라 치므로 화면에서는 버튼 하나로 끝낸다.
+   */
   function selfGrade(g: 'wrong' | 'slow' | 'fast') {
     if (phase !== 'reveal') return;
-    setSession((s) => answerCurrent(s, g !== 'wrong', g === 'slow'));
+    if (g === 'wrong') {
+      setResult({ correct: false, slow: false, ms: result?.ms ?? 0 });
+      setPhase('echo');
+      return;
+    }
+    setSession((s) => answerCurrent(s, true, g === 'slow'));
     shownAt.current = performance.now();
     setPhase('input');
     setResult(null);
   }
 
-  /** tap 오답 정정: 알고 있었는데 잘못 누름 → 맞음으로 넘기되 느림 취급(단계 유지) */
+  /**
+   * tap 오답 정정: 알고 있었는데 잘못 누름 → 맞음으로 넘기되 느림 취급(단계 유지).
+   * 알고 있었다면 따라 칠 것도 없으니 그대로 다음 카드로 간다.
+   */
   function markMistap() {
-    if (phase !== 'graded' || !result || result.correct) return;
-    setResult({ ...result, correct: true, slow: true });
-    setCorrected(true);
+    if (phase !== 'echo' || !result || result.correct) return;
+    setSession((s) => answerCurrent(s, true, true));
+    shownAt.current = performance.now();
+    setPhase('input');
+    setPcs([]);
+    pcsRef.current = [];
+    setResult(null);
+    setCorrected(false);
+    echo.reset();
   }
 
   useEffect(() => {
@@ -186,7 +228,11 @@ export function RoundRunner({ items, mode, freshIds, onFinish, onRemaining }: Pr
       } else if (phase === 'graded' && e.key === 'Enter') {
         e.preventDefault();
         next();
-      } else if (phase === 'graded' && e.key === '1') {
+      } else if (phase === 'echo' && e.key === 'Enter') {
+        // 키보드만 쓰는 사람은 실제 건반에서 따라 치고 Enter (화면 건반을 누를 손이 없다)
+        e.preventDefault();
+        next();
+      } else if (phase === 'echo' && e.key === '1') {
         e.preventDefault();
         markMistap();
       }
@@ -203,14 +249,26 @@ export function RoundRunner({ items, mode, freshIds, onFinish, onRemaining }: Pr
   const inputHl: KeyHighlight[] = pcs.map((pc, i) => ({ midi: 48 + pc, label: String(i + 1), kind: 'user' }));
   const secs = result ? (result.ms / 1000).toFixed(1) : '';
 
+  // 따라 치기: 정답 건반은 실제 음높이로, 입력 패드는 한 옥타브로 접어서
+  const echoHl: KeyHighlight[] = chord.midi.map((midi, i) => ({
+    midi,
+    label: String(i + 1),
+    kind: i < echo.done ? ('user' as const) : ('answer' as const),
+  }));
+  const echoPadHl: KeyHighlight[] = chord.midi.map((midi, i) => ({
+    midi: 48 + (midi % 12),
+    label: String(i + 1),
+    kind: i < echo.done ? ('user' as const) : ('answer' as const),
+  }));
+
   let verdict = '';
   let verdictClass = 'text-ivory-dim';
-  if (phase === 'graded' && result) {
+  if (phase === 'echo') {
+    verdict = `따라 치기 · ${echo.done}/${echo.total}`;
+    verdictClass = 'text-crimson';
+  } else if (phase === 'graded' && result) {
     if (corrected) verdict = '맞음으로 넘김';
-    else if (!result.correct) {
-      verdict = pcs.length === 4 ? '아니야' : '이렇게';
-      verdictClass = 'text-crimson';
-    } else if (result.slow) verdict = `맞음 · ${secs}초 · 한 번 더`;
+    else if (result.slow) verdict = `맞음 · ${secs}초 · 한 번 더`;
     else {
       verdict = `바로 · ${secs}초`;
       verdictClass = 'text-brass';
@@ -244,10 +302,10 @@ export function RoundRunner({ items, mode, freshIds, onFinish, onRemaining }: Pr
       <div className="flex flex-col gap-3">
         {revealed && (
           <>
-            <Keyboard from={48} to={71} highlights={answerHl} paged={false} />
+            <Keyboard from={48} to={71} highlights={phase === 'echo' ? echoHl : answerHl} paged={false} />
             <div className="text-center text-sm text-ivory-dim">
               {chord.noteNames.map(toGlyphs).join('  ')}
-              {phase === 'graded' && result && !result.correct && pcs.length === 4 && (
+              {phase === 'echo' && result && !result.correct && pcs.length === 4 && (
                 <span className="text-muted">
                   {'  ·  누른 순서 '}
                   {pcs.map((pc) => toGlyphs(ROOT_NAMES[pc])).join(' ')}
@@ -292,17 +350,36 @@ export function RoundRunner({ items, mode, freshIds, onFinish, onRemaining }: Pr
 
         {mode === 'tap' && phase === 'graded' && result && (
           <div className="grid grid-cols-2 gap-2">
-            {!result.correct && pcs.length === 4 ? (
-              <button onClick={markMistap} className="rounded-2xl border border-line py-4 text-ivory-dim active:bg-surface">
-                잘못 누름
-              </button>
-            ) : (
-              <div />
-            )}
+            <div />
             <button onClick={next} className="rounded-2xl bg-brass py-4 font-display text-xl text-felt-deep active:opacity-80">
               다음
             </button>
           </div>
+        )}
+
+        {/* 따라 치기 — 공개된 정답을 손으로 한 번 거치고 간다. 채점이 아니다 */}
+        {mode === 'tap' && phase === 'echo' && (
+          <>
+            <Keyboard from={48} to={59} highlights={echoPadHl} onKeyPress={echoKey} paged={false} />
+            {result && !result.correct && pcs.length === 4 && (
+              <button
+                onClick={markMistap}
+                className="rounded-2xl border border-line py-3.5 text-ivory-dim active:bg-surface"
+              >
+                잘못 누름 · 알고 있었음
+              </button>
+            )}
+            <div className="text-center text-[11px] text-muted">정답을 아래 음부터 차례로 · {echo.done}/4</div>
+          </>
+        )}
+
+        {mode === 'piano' && phase === 'echo' && (
+          <button
+            onClick={next}
+            className="h-32 rounded-3xl bg-brass text-lg font-display text-felt-deep active:opacity-80"
+          >
+            정답을 한 번 치고 · 다음
+          </button>
         )}
 
         {mode === 'piano' && phase === 'input' && (
