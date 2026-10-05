@@ -19,16 +19,19 @@ import {
 import { loadDegreeLabels, loadInputMode, saveDegreeLabels, saveInputMode, type InputMode } from '../state/prefs';
 import {
   curriculum,
+  dailyPlan,
+  degreeGate,
   dueToday,
   nextUnit,
-  planRound,
-  shouldIntroduce,
   unitState,
   UNIT_FORMS,
   type Unit,
 } from '../session/daily';
 import { QUALITIES } from '../engine/voicings';
 import { DailyShell } from '../components/DailyShell';
+import { DegreeRunner } from '../components/DegreeRunner';
+import { degreePool } from '../state/degreeProgress';
+import type { Session } from '../session/session';
 import { clock } from '../lib/clock';
 import { LessonIntro } from '../components/LessonIntro';
 import { RoundRunner, type RoundResult } from '../components/RoundRunner';
@@ -37,10 +40,13 @@ import { Seg } from '../components/Seg';
 type Props = {
   store: ProgressStore;
   onStoreChange: (next: ProgressStore) => void;
+  /** 도수 드릴 진도 — 보이싱과 별도 저장소 (진도 링크 포맷을 흔들지 않는다) */
+  degrees: ProgressStore;
+  onDegreesChange: (next: ProgressStore) => void;
   settings: Settings;
 };
 
-type Stage = 'home' | 'intro' | 'round' | 'break' | 'done';
+type Stage = 'home' | 'intro' | 'round' | 'degree' | 'break' | 'done';
 
 type Plan = { unit: Unit | null; fresh: Item[]; items: Item[] };
 
@@ -59,7 +65,7 @@ function isIosBrowserTab(): boolean {
  * 오늘의 15분. 홈 → (새 유닛 소개) → 판 → 판 사이 → … → 15분 채우면 끝 화면.
  * 판마다 바로 진도에 기록한다 — 중간에 닫아도 끝낸 판까지는 남는다.
  */
-export function TodayView({ store, onStoreChange, settings }: Props) {
+export function TodayView({ store, onStoreChange, degrees, onDegreesChange, settings }: Props) {
   const [stage, setStage] = useState<Stage>('home');
   const [day, setDay] = useState(studyDay);
   const [log, setLog] = useState<TimeLog>(loadTimeLog);
@@ -74,11 +80,12 @@ export function TodayView({ store, onStoreChange, settings }: Props) {
   const [extended, setExtended] = useState(false);
 
   const pool = useMemo(() => enabledItems(settings), [settings]);
+  const degPool = useMemo(() => degreePool(), []);
   const types = useMemo(() => enabledTypes(settings), [settings]);
   const units = useMemo(() => curriculum(enabledForms(settings), types), [settings, types]);
 
   const todaySec = log[day] ?? 0;
-  const active = stage === 'intro' || stage === 'round';
+  const active = stage === 'intro' || stage === 'round' || stage === 'degree';
 
   // 홈에 돌아올 때마다 학습일을 다시 본다 (자정·새벽 4시를 넘겨 켜둔 경우)
   useEffect(() => {
@@ -99,27 +106,30 @@ export function TodayView({ store, onStoreChange, settings }: Props) {
     return () => clearInterval(t);
   }, [active, day]);
 
-  /** 다음 판을 준비한다: 들일 수 있으면 새 유닛 소개부터, 아니면 복습 판 */
+  /**
+   * 다음 판을 준비한다. **도수가 보이싱보다 먼저다** (dailyPlan).
+   * 곧 배울 코드의 도수가 안 섰거나 도수 복습이 밀렸으면 도수 판, 아니면 소개/보이싱 판.
+   */
   const startNext = useCallback(
-    (s: ProgressStore) => {
-      const unitsToday = loadUnitsToday(day);
-      if (shouldIntroduce(s, pool, units, day, unitsToday)) {
-        // 기둥(앞 코드·메이저 짝·A형)이 선 유닛을 고른다
-        const nu = nextUnit(s, units, pool)!;
-        setPlan({ unit: nu.unit, fresh: nu.fresh, items: planRound(s, pool, day, nu.fresh) });
+    (s: ProgressStore, deg: ProgressStore) => {
+      const next = dailyPlan(s, deg, pool, degPool, units, day, loadUnitsToday(day));
+      if (next.kind === 'empty') {
+        setStage('home');
+        return;
+      }
+      if (next.kind === 'degree') {
+        setPlan({ unit: null, fresh: [], items: next.items });
+        setStage('degree');
+      } else if (next.kind === 'intro') {
+        setPlan({ unit: next.unit, fresh: next.fresh, items: next.items });
         setStage('intro');
       } else {
-        const items = planRound(s, pool, day);
-        if (items.length === 0) {
-          setStage('home');
-          return;
-        }
-        setPlan({ unit: null, fresh: [], items });
+        setPlan({ unit: null, fresh: [], items: next.items });
         setStage('round');
       }
       setRoundNo((n) => n + 1);
     },
-    [day, pool, units],
+    [day, pool, degPool, units],
   );
 
   const finishRound = useCallback(
@@ -153,6 +163,27 @@ export function TodayView({ store, onStoreChange, settings }: Props) {
     [plan, store, day, onStoreChange, extended],
   );
 
+  /** 도수 판 결과 — 도수 저장소에만 기록한다 */
+  const finishDegreeRound = useCallback(
+    (session: Session) => {
+      const fresh = (plan?.items ?? []).filter((it) => !(itemId(it) in degrees.items));
+      const next = applyResults(degrees, session.firstTry, {
+        day,
+        slow: session.firstSlow,
+        introduced: fresh.map(itemId),
+      });
+      onDegreesChange(next);
+
+      const ids = Object.keys(session.firstTry);
+      const ok = ids.filter((id) => session.firstTry[id]).length;
+      setLastRound({ n: ids.length, ok, avg: 0 });
+      setStats((st) => ({ ...st, cards: st.cards + ids.length, firstOk: st.firstOk + ok }));
+      const reached = (loadTimeLog()[day] ?? 0) >= DAILY_GOAL_SEC;
+      setStage(reached && !extended ? 'done' : 'break');
+    },
+    [plan, degrees, day, onDegreesChange, extended],
+  );
+
   const close = useCallback(() => {
     setStage('home');
     setPlan(null);
@@ -174,7 +205,7 @@ export function TodayView({ store, onStoreChange, settings }: Props) {
       if (e.key === 'Enter') {
         e.preventDefault();
         if (stage === 'done') setExtended(true);
-        startNext(store);
+        startNext(store, degrees);
       } else if (e.key === 'Escape' && stage !== 'home') {
         e.preventDefault();
         close();
@@ -189,6 +220,21 @@ export function TodayView({ store, onStoreChange, settings }: Props) {
     return (
       <DailyShell todaySec={todaySec} onClose={close}>
         <LessonIntro unit={plan.unit} fresh={plan.fresh} onDone={() => setStage('round')} />
+      </DailyShell>
+    );
+  }
+
+  if (stage === 'degree' && plan) {
+    return (
+      <DailyShell todaySec={todaySec} onClose={close} aside={`${left}장`}>
+        <DegreeRunner
+          key={roundNo}
+          draw={() => plan.items}
+          embedded
+          onFinish={finishDegreeRound}
+          onRemaining={setLeft}
+          onExit={close}
+        />
       </DailyShell>
     );
   }
@@ -232,7 +278,7 @@ export function TodayView({ store, onStoreChange, settings }: Props) {
               그만
             </button>
             <button
-              onClick={() => startNext(store)}
+              onClick={() => startNext(store, degrees)}
               className="rounded-2xl bg-brass py-4 font-display text-xl text-felt-deep active:opacity-80"
             >
               계속
@@ -280,7 +326,7 @@ export function TodayView({ store, onStoreChange, settings }: Props) {
             <button
               onClick={() => {
                 setExtended(true);
-                startNext(store);
+                startNext(store, degrees);
               }}
               className="rounded-2xl border border-line py-4 text-ivory-dim active:bg-surface"
             >
@@ -297,6 +343,9 @@ export function TodayView({ store, onStoreChange, settings }: Props) {
 
   // ── 홈 ───────────────────────────────────────────────────
   const due = dueToday(store, pool, day).length;
+  // 도수는 보이싱보다 먼저 — 곧 배울 코드의 도수 + 밀린 도수 복습
+  const degreeTodo =
+    degreeGate(store, degrees, units, day).length + dueToday(degrees, degPool, day).length;
   const nu = nextUnit(store, units, pool);
   const date = dayToDate(day);
   const pct = Math.min(1, todaySec / DAILY_GOAL_SEC);
@@ -326,6 +375,7 @@ export function TodayView({ store, onStoreChange, settings }: Props) {
       <Week log={log} day={day} />
 
       <div className="flex flex-col gap-2 rounded-2xl border border-line bg-felt-deep p-4">
+        <Row label="도수" value={degreeTodo > 0 ? `${degreeTodo}장` : '다 섰음'} />
         <Row label="복습" value={due > 0 ? `${due}장` : '없음'} />
         <Row label="새로" value={nu ? unitLabel(nu.unit) : '코스 다 배움 · 복습만'} />
       </div>
@@ -335,7 +385,7 @@ export function TodayView({ store, onStoreChange, settings }: Props) {
           onClick={() => {
             setStats(EMPTY_STATS);
             setExtended(doneToday);
-            startNext(store);
+            startNext(store, degrees);
           }}
           className="rounded-2xl bg-brass py-5 font-display text-2xl text-felt-deep active:opacity-80"
         >

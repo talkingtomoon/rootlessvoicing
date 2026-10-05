@@ -229,6 +229,125 @@ export function planRound(
   return picked;
 }
 
+/** 도수가 이만큼 굳어야 그 코드의 보이싱으로 넘어간다 (단계 2 = 다른 날에 한 번 이상 맞힘) */
+export const DEGREE_READY_LEVEL = 2;
+/** 하루에 다루는 도수 카드 상한 — 하루 유닛 상한과 같은 양(유닛 3개 × 3루트).
+ *  이만큼 하고 나면 그날은 보이싱으로 넘어간다. 안 그러면 도수가 매 판 새 카드를 끌어와 보이싱이 안 열린다. */
+export const DEGREE_GATE_LIMIT = MAX_UNITS_PER_DAY * BLOCK_SIZE;
+
+/** 오늘 이미 손댄 도수 카드 수 */
+export function degreesSeenToday(degrees: ProgressStore, pool: Item[], day: string): number {
+  return pool.filter((it) => seenToday(degrees, itemId(it), day)).length;
+}
+
+/** 도수 item — 폼과 무관하므로 A로 고정해 식별자만 빌려 쓴다 */
+export function degreeOf(item: Item): Item {
+  return { rootPc: item.rootPc, quality: item.quality, form: 'A' };
+}
+
+export function degreeReady(degrees: ProgressStore, item: Item): boolean {
+  return (degrees.items[itemId(degreeOf(item))]?.level ?? 0) >= DEGREE_READY_LEVEL;
+}
+
+/**
+ * 아직 도수가 안 선, 곧 배울 코드들. 코스 순서대로 앞에서부터.
+ * **보이싱보다 먼저 거치는 층**이라 이게 비어야 새 보이싱 유닛이 열린다.
+ */
+export function degreeGate(
+  store: ProgressStore,
+  degrees: ProgressStore,
+  units: Unit[],
+  day: string,
+): Item[] {
+  const out: Item[] = [];
+  const picked = new Set<ItemId>();
+  for (const unit of units) {
+    for (const item of unit.items) {
+      if (isLearned(store, item)) continue; // 보이싱을 이미 배운 코드는 도수도 지났다고 본다
+      if (degreeReady(degrees, item)) continue;
+      const id = itemId(degreeOf(item));
+      // 오늘 이미 한 카드는 오늘 더 올라가지 않는다 — 붙잡아 두면 판이 끝없이 돈다
+      if (seenToday(degrees, id, day)) continue;
+      if (picked.has(id)) continue;
+      picked.add(id);
+      out.push(degreeOf(item));
+      if (out.length >= DEGREE_GATE_LIMIT) return out;
+    }
+  }
+  return out;
+}
+
+/** 도수 판: ① 곧 배울 코드 ② 오늘 안 본 due ③ 오늘 흔들린 것 */
+export function planDegreeRound(
+  degrees: ProgressStore,
+  gate: Item[],
+  day: string,
+  pool: Item[],
+  size = ROUND_SIZE,
+): Item[] {
+  const picked: Item[] = [];
+  const has = new Set<ItemId>();
+  const add = (items: Item[]) => {
+    for (const it of items) {
+      if (picked.length >= size) return;
+      const id = itemId(it);
+      if (has.has(id)) continue;
+      has.add(id);
+      picked.push(it);
+    }
+  };
+  add(gate);
+  add(dueToday(degrees, pool, day));
+  const learned = pool.filter((it) => isLearned(degrees, it));
+  const byLevel = (a: Item, b: Item) =>
+    degrees.items[itemId(a)].level - degrees.items[itemId(b)].level ||
+    degrees.items[itemId(a)].lastSeenSession - degrees.items[itemId(b)].lastSeenSession;
+  add(learned.filter((it) => seenToday(degrees, itemId(it), day)).sort(byLevel));
+  return picked;
+}
+
+export type DailyPlan =
+  | { kind: 'degree'; items: Item[] }
+  | { kind: 'intro'; unit: Unit; fresh: Item[]; items: Item[] }
+  | { kind: 'round'; items: Item[] }
+  | { kind: 'empty' };
+
+/**
+ * 오늘의 다음 판. **도수가 보이싱보다 먼저다.**
+ * 곧 배울 코드의 도수가 안 섰거나 도수 복습이 밀렸으면 도수 판을 먼저 낸다.
+ * 그래서 처음 몇 주는 자연히 도수가 주가 되고, 도수가 굳는 만큼 보이싱으로 넘어간다.
+ */
+export function dailyPlan(
+  store: ProgressStore,
+  degrees: ProgressStore,
+  pool: Item[],
+  degreeItemPool: Item[],
+  units: Unit[],
+  day: string,
+  unitsToday: number,
+): DailyPlan {
+  // 밀린 도수 복습이 먼저, 그다음 새 도수. 둘 다 하루 분량(DEGREE_GATE_LIMIT)까지만 —
+  // 그 뒤로는 같은 날 안에서 보이싱으로 넘어간다.
+  const degreeDue = dueToday(degrees, degreeItemPool, day);
+  const roomForNew = degreesSeenToday(degrees, degreeItemPool, day) < DEGREE_GATE_LIMIT;
+  const gate = roomForNew ? degreeGate(store, degrees, units, day) : [];
+  if (degreeDue.length > 0 || gate.length > 0) {
+    const items = planDegreeRound(degrees, gate, day, degreeItemPool);
+    if (items.length > 0) return { kind: 'degree', items };
+  }
+
+  if (shouldIntroduce(store, pool, units, day, unitsToday)) {
+    const nu = nextUnit(store, units, pool);
+    // 도수가 안 선 유닛은 아직 열지 않는다 (gate가 비었다면 이미 선 것)
+    if (nu && nu.fresh.every((it) => degreeReady(degrees, it))) {
+      return { kind: 'intro', unit: nu.unit, fresh: nu.fresh, items: planRound(store, pool, day, nu.fresh) };
+    }
+  }
+
+  const items = planRound(store, pool, day);
+  return items.length > 0 ? { kind: 'round', items } : { kind: 'empty' };
+}
+
 /** 반응 시간 기준 (ms). 이보다 오래 걸리면 맞아도 "느림" — 단계를 올리지 않는다 */
 export const FAST_MS = {
   /** 화면 건반에 4음 순서대로 — 누르는 시간까지 포함 */

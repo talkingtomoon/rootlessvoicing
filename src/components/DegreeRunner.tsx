@@ -18,6 +18,12 @@ type Props = {
   onExit: () => void;
   /** 받은 순서 그대로 낼까 (키 순서 '4도 순환') */
   keepOrder?: boolean;
+  /** 오늘 탭 안에 넣을 때 — 바깥 틀(DailyShell)이 머리말과 판 사이 화면을 맡는다 */
+  embedded?: boolean;
+  /** 판이 끝났을 때 (도수 진도 기록용) */
+  onFinish?: (session: Session) => void;
+  /** 남은 카드 수를 바깥 틀에 알린다 */
+  onRemaining?: (n: number) => void;
 };
 
 type Phase = 'input' | 'reveal' | 'graded' | 'echo';
@@ -30,7 +36,7 @@ type Phase = 'input' | 'reveal' | 'graded' | 'echo';
  * 진도(Leitner)에는 기록하지 않는다 — 보이싱 앞에 두는 층이고,
  * 진도 링크 포맷(144 item)을 흔들지 않기 위해서다.
  */
-export function DegreeRunner({ draw, onExit, keepOrder = false }: Props) {
+export function DegreeRunner({ draw, onExit, keepOrder = false, embedded = false, onFinish, onRemaining }: Props) {
   const [session, setSession] = useState<Session>(() => createSession(draw(), Date.now(), Math.random, keepOrder));
   const [phase, setPhase] = useState<Phase>('input');
   /** 지금까지 맞게 찍은 개수 */
@@ -47,6 +53,18 @@ export function DegreeRunner({ draw, onExit, keepOrder = false }: Props) {
   const echo = useEcho(pcs, true);
 
   const sound = useCallback((pc: number) => playNote(PAD_FROM + (((pc - PAD_FROM) % 12) + 12) % 12), []);
+
+  useEffect(() => {
+    onRemaining?.(remaining(session));
+  }, [session, onRemaining]);
+
+  // 판이 끝나면 한 번만 알린다 (StrictMode 이중 실행 방지용 ref 가드)
+  const reported = useRef<Session | null>(null);
+  useEffect(() => {
+    if (session.current || reported.current === session) return;
+    reported.current = session;
+    onFinish?.(session);
+  }, [session, onFinish]);
 
   const reset = useCallback(() => {
     setPhase('input');
@@ -132,6 +150,9 @@ export function DegreeRunner({ draw, onExit, keepOrder = false }: Props) {
   });
 
   // ── 종료 화면 ───────────────────────────────────────────
+  // 오늘 탭 안에서는 바깥(TodayView)이 판 사이 화면을 맡는다
+  if (embedded && (!card || !item)) return null;
+
   if (!card || !item) {
     const sum = summarize(session, Date.now());
     const min = Math.floor(sum.elapsedMs / 60000);
@@ -193,17 +214,26 @@ export function DegreeRunner({ draw, onExit, keepOrder = false }: Props) {
   ].filter((h) => showAll || h.kind === 'user');
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-5 px-4 py-6">
-      <div className="flex items-baseline justify-between">
-        <div className="font-display text-2xl text-ivory">
-          남은 카드 <span className="text-brass">{remaining(session)}</span>
+    <div
+      className={
+        embedded
+          ? 'flex flex-1 flex-col gap-5 pb-[max(1rem,env(safe-area-inset-bottom))]'
+          : 'mx-auto flex max-w-3xl flex-col gap-5 px-4 py-6'
+      }
+    >
+      {!embedded && (
+        <div className="flex items-baseline justify-between">
+          <div className="font-display text-2xl text-ivory">
+            남은 카드 <span className="text-brass">{remaining(session)}</span>
+          </div>
+          <button onClick={onExit} className="text-sm text-muted hover:text-ivory-dim">
+            나가기 <kbd>Esc</kbd>
+          </button>
         </div>
-        <button onClick={onExit} className="text-sm text-muted hover:text-ivory-dim">
-          나가기 <kbd>Esc</kbd>
-        </button>
-      </div>
+      )}
 
       <div className="text-center">
+        {embedded && <div className="mb-1 text-[11px] tracking-widest text-brass">도수</div>}
         <span className="font-display text-6xl text-ivory">
           {chordSymbol(ROOT_NAMES[item.rootPc], item.quality, revealed ? 'full' : 'quiz')}
         </span>
@@ -290,7 +320,9 @@ export function DegreeRunner({ draw, onExit, keepOrder = false }: Props) {
         )}
       </div>
 
-      <Keyboard from={PAD_FROM} to={PAD_TO} highlights={highlights} onKeyPress={press} paged={false} guide={false} />
+      <div className={embedded ? 'mt-auto' : ''}>
+        <Keyboard from={PAD_FROM} to={PAD_TO} highlights={highlights} onKeyPress={press} paged={false} guide={false} />
+      </div>
     </div>
   );
 }

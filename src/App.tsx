@@ -7,6 +7,7 @@ import { studyDay } from './state/day';
 import { SettingsDrawer } from './components/SettingsDrawer';
 import { initAudio, installAudioUnlock } from './audio/audio';
 import { applyResults, loadProgress, mergeProgress, saveProgress, type ProgressStore } from './state/progress';
+import { loadDegreeProgress, saveDegreeProgress } from './state/degreeProgress';
 import { clearIncoming, readIncoming } from './state/progressCode';
 import { loadSettings, saveSettings, type Settings } from './state/settings';
 
@@ -17,6 +18,8 @@ export default function App() {
   const [incoming, setIncoming] = useState(readIncoming);
   const [mode, setMode] = useState<Mode>(() => (incoming ? 'progress' : 'today'));
   const [progress, setProgress] = useState(loadProgress);
+  // 도수 드릴 진도는 따로 둔다 (진도 링크 포맷을 흔들지 않는다)
+  const [degrees, setDegrees] = useState(loadDegreeProgress);
   const [settings, setSettings] = useState(loadSettings);
 
   useEffect(() => {
@@ -36,6 +39,11 @@ export default function App() {
   const replaceProgress = useCallback((next: ProgressStore) => {
     saveProgress(next);
     setProgress(next);
+  }, []);
+
+  const replaceDegrees = useCallback((next: ProgressStore) => {
+    saveDegreeProgress(next);
+    setDegrees(next);
   }, []);
 
   // 이미 열어둔 창에 링크를 붙여넣으면 해시만 바뀌고 리로드는 안 된다 — 그때도 받아준다
@@ -112,11 +120,23 @@ export default function App() {
       </div>
 
       {mode === 'today' && (
-        <TodayView store={progress} onStoreChange={replaceProgress} settings={settings} />
+        <TodayView
+          store={progress}
+          onStoreChange={replaceProgress}
+          degrees={degrees}
+          onDegreesChange={replaceDegrees}
+          settings={settings}
+        />
       )}
       {mode === 'explore' && <ExploreView />}
       {mode === 'memorize' && (
-        <MemorizeView store={progress} onFinish={recordSession} settings={settings} />
+        <MemorizeView
+          store={progress}
+          onFinish={recordSession}
+          degrees={degrees}
+          onDegreesChange={replaceDegrees}
+          settings={settings}
+        />
       )}
       {mode === 'progress' && (
         <ProgressView

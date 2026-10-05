@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Form } from '../engine/types';
 import { itemsOf, sortByFourths, type KeyOrder } from '../engine/items';
-import { selectItems, type ProgressStore } from '../state/progress';
+import { applyResults, selectItems, type ProgressStore } from '../state/progress';
 import { enabledItems, type Settings } from '../state/settings';
 import { QUALITIES } from '../engine/voicings';
 import { QUALITY_SYMBOL } from '../engine/format';
@@ -33,6 +33,9 @@ import {
 type Props = {
   store: ProgressStore;
   onFinish: (firstTry: Record<string, boolean>) => void;
+  /** 도수 드릴 진도 (보이싱과 별도 저장소) */
+  degrees: ProgressStore;
+  onDegreesChange: (next: ProgressStore) => void;
   settings: Settings;
 };
 
@@ -42,7 +45,7 @@ type Props = {
  * - 타입별: quality × form 하나의 12루트 한 바퀴 (선정 규칙을 건너뛰는 직접 지정)
  * - 도수: 보이싱 앞 층. 코드 심볼 → 구성음을 루트부터 차례로 (72개, 진도에는 기록하지 않는다)
  */
-export function MemorizeView({ store, onFinish, settings }: Props) {
+export function MemorizeView({ store, onFinish, degrees, onDegreesChange, settings }: Props) {
   const [mode, setMode] = useState<MemorizeMode>(loadLastMemorizeMode);
   const [running, setRunning] = useState(false);
   const [n, setN] = useState(loadLastSessionSize);
@@ -107,6 +110,9 @@ export function MemorizeView({ store, onFinish, settings }: Props) {
             : shuffle(degreePool, Math.random).slice(0, size)
         }
         keepOrder={keyOrder === 'fourths'}
+        onFinish={(session) =>
+          onDegreesChange(applyResults(degrees, session.firstTry, { day: studyDay() }))
+        }
         onExit={() => setRunning(false)}
       />
     );

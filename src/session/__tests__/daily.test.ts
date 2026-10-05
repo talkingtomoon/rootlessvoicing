@@ -4,6 +4,11 @@ import { applyResults, emptyProgress, nextSessionNo, seenToday, type ProgressSto
 import {
   BLOCKS,
   curriculum,
+  dailyPlan,
+  degreeGate,
+  degreeOf,
+  degreeReady,
+  DEGREE_GATE_LIMIT,
   dueToday,
   FRAGILE_LIMIT,
   isEligible,
@@ -17,30 +22,51 @@ import {
   unitState,
 } from '../daily';
 import { answerCurrent, createSession } from '../session';
+import { degreeItems } from '../../engine/degrees';
 import { addDays, studyDay, weekOf } from '../../state/day';
 
 const all = allItems();
 const ok = (items: Item[]) => Object.fromEntries(items.map((it) => [itemId(it), true]));
 
-/** 하루치 연습 — 오늘 탭(TodayView)이 도는 순서 그대로. 전부 첫 시도 정답. */
-function runDay(store: ProgressStore, day: string, maxRounds = 8): { store: ProgressStore; learned: Item[] } {
+const degPool = degreeItems();
+
+type DayState = { store: ProgressStore; degrees: ProgressStore };
+
+/**
+ * 하루치 연습 — 오늘 탭(TodayView)이 도는 순서 그대로(dailyPlan). 전부 첫 시도 정답.
+ * 어떤 종류의 판이 나왔는지도 돌려준다.
+ */
+function runDay(
+  state: DayState,
+  day: string,
+  maxRounds = 8,
+): DayState & { learned: Item[]; kinds: string[] } {
   const units = curriculum();
+  let { store, degrees } = state;
   const learned: Item[] = [];
+  const kinds: string[] = [];
   let unitsToday = 0;
   for (let r = 0; r < maxRounds; r++) {
-    let fresh: Item[] = [];
-    if (shouldIntroduce(store, all, units, day, unitsToday)) {
-      fresh = nextUnit(store, units, all)!.fresh;
-      learned.push(...fresh);
-      unitsToday++;
-    }
-    const items = planRound(store, all, day, fresh);
-    if (items.length === 0) break;
-    let s = createSession(items, 0, Math.random);
+    const plan = dailyPlan(store, degrees, all, degPool, units, day, unitsToday);
+    if (plan.kind === 'empty') break;
+    kinds.push(plan.kind);
+    const fresh = plan.kind === 'intro' ? plan.fresh : [];
+    if (plan.kind === 'intro') unitsToday++;
+    let s = createSession(plan.items, 0, Math.random);
     while (s.current) s = answerCurrent(s, true);
-    store = applyResults(store, s.firstTry, { day, slow: s.firstSlow, introduced: fresh.map(itemId) });
+    if (plan.kind === 'degree') {
+      const freshDeg = plan.items.filter((it) => !(itemId(it) in degrees.items));
+      degrees = applyResults(degrees, s.firstTry, {
+        day,
+        slow: s.firstSlow,
+        introduced: freshDeg.map(itemId),
+      });
+    } else {
+      learned.push(...fresh);
+      store = applyResults(store, s.firstTry, { day, slow: s.firstSlow, introduced: fresh.map(itemId) });
+    }
   }
-  return { store, learned };
+  return { store, degrees, learned, kinds };
 }
 
 describe('코스 — 같은 모양을 세 루트로', () => {
@@ -146,33 +172,89 @@ describe('기둥 규칙', () => {
   });
 });
 
+describe('도수 층', () => {
+  const units = curriculum();
+
+  it('도수가 안 선 코드는 보이싱 유닛이 열리지 않는다', () => {
+    const plan = dailyPlan(emptyProgress(), emptyProgress(), all, degPool, units, '2026-10-01', 0);
+    expect(plan.kind).toBe('degree');
+    if (plan.kind !== 'degree') return;
+    // 코스 앞쪽 코드들의 도수부터
+    expect(plan.items.every((it) => it.form === 'A')).toBe(true);
+    expect(plan.items.length).toBeGreaterThan(0);
+  });
+
+  it('도수 관문은 코스 순서대로, 하루 유닛 상한만큼만 집는다', () => {
+    const gate = degreeGate(emptyProgress(), emptyProgress(), units, 'd');
+    expect(gate).toHaveLength(DEGREE_GATE_LIMIT);
+    // 코스 앞 유닛들 순서 그대로 (한 블록의 ii·V·I 도수를 함께 깐다)
+    expect(gate.map((it) => itemId(it))).toEqual(
+      units.slice(0, 3).flatMap((u) => u.items.map((it) => itemId(degreeOf(it)))),
+    );
+  });
+
+  it('도수가 단계 2 이상이면 그 코드의 보이싱으로 넘어간다', () => {
+    const fresh = units[0].items;
+    const deg1 = applyResults(emptyProgress(), ok(fresh.map(degreeOf)), {
+      day: 'd1',
+      introduced: fresh.map((it) => itemId(degreeOf(it))),
+    });
+    expect(fresh.every((it) => degreeReady(deg1, it))).toBe(false); // 들인 날은 단계 1
+    const deg2 = applyResults(deg1, ok(fresh.map(degreeOf)), { day: 'd2' });
+    expect(fresh.every((it) => degreeReady(deg2, it))).toBe(true);
+  });
+
+  it('보이싱을 이미 배운 코드는 도수 관문을 막지 않는다', () => {
+    const learned = applyResults(emptyProgress(), ok(all), { day: 'x' });
+    expect(degreeGate(learned, emptyProgress(), units, 'd')).toHaveLength(0);
+  });
+});
+
 describe('하루하루 흐름', () => {
-  it('첫날은 ii만, 다음 날 V, 그다음 날 I이 들어온다', () => {
+  it('첫날은 도수만, 그다음 보이싱 ii → V → I 순으로 열린다', () => {
+    let state = { store: emptyProgress(), degrees: emptyProgress() };
+    const d1 = runDay(state, '2026-10-01');
+    expect(new Set(d1.kinds)).toEqual(new Set(['degree']));
+    expect(d1.learned).toHaveLength(0); // 보이싱은 아직
+    expect(Object.keys(d1.degrees.items).length).toBeGreaterThan(0);
+
+    state = { store: d1.store, degrees: d1.degrees };
+    const d2 = runDay(state, '2026-10-02');
+    expect(d2.kinds).toContain('intro'); // 도수가 섰으니 보이싱이 열린다
+    expect(new Set(d2.learned.map((it) => it.quality))).toEqual(new Set(['m7']));
+  });
+
+  it('첫날은 ii만, 다음 날 V, 그다음 날 I이 들어온다 (도수는 미리 서 있다고 보고)', () => {
+    // 도수를 모두 굳혀 두면 보이싱 층만 남는다
+    let degrees = applyResults(emptyProgress(), ok(degPool), { day: 'd0' });
+    degrees = applyResults(degrees, ok(degPool), { day: 'd0b' });
     let store = emptyProgress();
-    const day1 = runDay(store, '2026-10-01');
+    const day1 = runDay({ store, degrees }, '2026-10-01');
     store = day1.store;
     expect(day1.learned).toHaveLength(MAX_UNITS_PER_DAY * 3);
     expect(new Set(day1.learned.map((it) => it.quality))).toEqual(new Set(['m7']));
 
-    const day2 = runDay(store, '2026-10-02');
+    const day2 = runDay({ store, degrees }, '2026-10-02');
     store = day2.store;
     const q2 = new Set(day2.learned.map((it) => it.quality));
     expect(q2.has('dom7')).toBe(true); // ii가 굳었으니 V가 들어온다
     expect(q2.has('maj7')).toBe(false); // I는 V가 굳어야 들어온다
 
-    const day3 = runDay(store, '2026-10-03');
+    const day3 = runDay({ store, degrees }, '2026-10-03');
     expect(new Set(day3.learned.map((it) => it.quality)).has('maj7')).toBe(true);
     expect(store.session).toBe(2);
   });
 
-  it('보름이면 코스를 거의 다 훑는다 (하루 9개 상한)', () => {
-    let store = emptyProgress();
+  it('도수까지 다 돌면 한 달쯤에 코스를 훑는다', () => {
+    let state = { store: emptyProgress(), degrees: emptyProgress() };
     let day = '2026-10-01';
-    for (let d = 0; d < 15; d++) {
-      store = runDay(store, day).store;
+    for (let d = 0; d < 30; d++) {
+      const r = runDay(state, day);
+      state = { store: r.store, degrees: r.degrees };
       day = addDays(day, 1);
     }
-    expect(Object.keys(store.items).length).toBeGreaterThan(100);
+    expect(Object.keys(state.degrees.items).length).toBeGreaterThan(50);
+    expect(Object.keys(state.store.items).length).toBeGreaterThan(60);
   });
 });
 
