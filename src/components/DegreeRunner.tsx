@@ -16,6 +16,8 @@ type Props = {
   /** 이번 세션에 낼 item 목록 (form은 쓰지 않는다 — 도수는 폼과 무관하다) */
   draw: () => Item[];
   onExit: () => void;
+  /** 받은 순서 그대로 낼까 (키 순서 '4도 순환') */
+  keepOrder?: boolean;
 };
 
 type Phase = 'input' | 'reveal' | 'graded' | 'echo';
@@ -28,8 +30,8 @@ type Phase = 'input' | 'reveal' | 'graded' | 'echo';
  * 진도(Leitner)에는 기록하지 않는다 — 보이싱 앞에 두는 층이고,
  * 진도 링크 포맷(144 item)을 흔들지 않기 위해서다.
  */
-export function DegreeRunner({ draw, onExit }: Props) {
-  const [session, setSession] = useState<Session>(() => createSession(draw(), Date.now(), Math.random));
+export function DegreeRunner({ draw, onExit, keepOrder = false }: Props) {
+  const [session, setSession] = useState<Session>(() => createSession(draw(), Date.now(), Math.random, keepOrder));
   const [phase, setPhase] = useState<Phase>('input');
   /** 지금까지 맞게 찍은 개수 */
   const [filled, setFilled] = useState(0);
@@ -107,7 +109,7 @@ export function DegreeRunner({ draw, onExit }: Props) {
       } else if (!session.current) {
         if (e.key === 'Enter') {
           e.preventDefault();
-          setSession(createSession(draw(), Date.now(), Math.random));
+          setSession(createSession(draw(), Date.now(), Math.random, keepOrder));
           reset();
         }
       } else if (phase === 'input' && e.key === ' ') {
@@ -155,7 +157,7 @@ export function DegreeRunner({ draw, onExit }: Props) {
         <div className="flex gap-3">
           <button
             onClick={() => {
-              setSession(createSession(draw(), Date.now(), Math.random));
+              setSession(createSession(draw(), Date.now(), Math.random, keepOrder));
               reset();
             }}
             className="rounded-full border border-brass px-6 py-2.5 text-ivory hover:bg-surface"

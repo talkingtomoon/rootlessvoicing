@@ -1,4 +1,5 @@
 import type { ChordQuality, Form } from '../engine/types';
+import type { KeyOrder } from '../engine/items';
 import { SESSION_SIZES } from '../session/session';
 import { QUALITIES } from '../engine/voicings';
 
@@ -61,6 +62,27 @@ export function loadLastExploreMode(): 'progression' | 'type' {
 
 export function saveLastExploreMode(m: 'progression' | 'type'): void {
   localStorage.setItem(LAST_EXPLORE_MODE_KEY, m);
+}
+
+const KEY_ORDER_KEY = 'rootless:keyOrder';
+const DEGREE_LABELS_KEY = 'rootless:degreeLabels';
+
+/** 세션의 키 순서 — 4도 순환이 기본 */
+export function loadKeyOrder(): KeyOrder {
+  return localStorage.getItem(KEY_ORDER_KEY) === 'random' ? 'random' : 'fourths';
+}
+
+export function saveKeyOrder(o: KeyOrder): void {
+  localStorage.setItem(KEY_ORDER_KEY, o);
+}
+
+/** 보이싱 문제 화면에 도수를 같이 보여줄까 — 기본 켜짐 (도수 드릴에서 넘어오는 다리) */
+export function loadDegreeLabels(): boolean {
+  return localStorage.getItem(DEGREE_LABELS_KEY) !== 'off';
+}
+
+export function saveDegreeLabels(on: boolean): void {
+  localStorage.setItem(DEGREE_LABELS_KEY, on ? 'on' : 'off');
 }
 
 const INPUT_MODE_KEY = 'rootless:inputMode';

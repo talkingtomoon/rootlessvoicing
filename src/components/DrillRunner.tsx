@@ -22,6 +22,10 @@ type Props = {
   onExit: () => void;
   /** 세션이 끝났을 때 item별 첫 시도 결과를 넘긴다 (Leitner 갱신용). 세션당 한 번만 호출된다. */
   onFinish?: (firstTry: Record<string, boolean>) => void;
+  /** 문제 화면에 보이싱 도수를 같이 보여줄까 (도수 드릴에서 보이싱으로 넘어오는 다리) */
+  showDegrees?: boolean;
+  /** 받은 순서 그대로 낼까 (키 순서 '4도 순환') */
+  keepOrder?: boolean;
 };
 
 function itemLabel(item: Item): string {
@@ -36,9 +40,9 @@ function findItem(id: string): Item | null {
  * 보관함 루프 실행부 — 암기/타입별 모드가 공유한다.
  * 어떤 item을 낼지는 draw()가 정하고, 여기서는 출제·채점·집계만 한다.
  */
-export function DrillRunner({ draw, onExit, onFinish }: Props) {
+export function DrillRunner({ draw, onExit, onFinish, showDegrees = true, keepOrder = false }: Props) {
   const [session, setSession] = useState<Session>(() =>
-    createSession(draw(), Date.now(), Math.random),
+    createSession(draw(), Date.now(), Math.random, keepOrder),
   );
   const [phase, setPhase] = useState<QuizPhase>('input');
   /** 이 카드에 실제로 적용될 결과 (정정 후 값) */
@@ -69,7 +73,7 @@ export function DrillRunner({ draw, onExit, onFinish }: Props) {
   }, [session, onFinish]);
 
   function restart() {
-    setSession(createSession(draw(), Date.now(), Math.random));
+    setSession(createSession(draw(), Date.now(), Math.random, keepOrder));
     setPhase('input');
     setLastCorrect(null);
     setAutoCorrect(null);
@@ -279,6 +283,10 @@ export function DrillRunner({ draw, onExit, onFinish }: Props) {
           <span className="rounded-md border border-line px-2 py-0.5 text-sm text-ivory-dim">
             {card.item.form}형
           </span>
+        </div>
+        {/* 도수 라벨 — 무엇을 눌러야 하는지의 절반. 익숙해지면 끈다 */}
+        <div className="mt-1 min-h-5 text-sm tracking-widest text-brass">
+          {showDegrees ? chord!.degrees.map(toGlyphs).join(' ') : ''}
         </div>
         <div className="mt-2 min-h-4 text-xs tracking-widest text-muted">
           {revealed ? `${keyLabel(card.ctx.keyPc, card.ctx.type)} · ${card.ctx.roman}` : ''}

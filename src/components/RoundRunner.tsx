@@ -24,6 +24,8 @@ type Props = {
   mode: InputMode;
   /** 이번 판에 처음 배운 item — 카드에 '새' 표시 */
   freshIds: ItemId[];
+  /** 문제 화면에 보이싱 도수를 같이 보여줄까 */
+  showDegrees?: boolean;
   onFinish: (r: RoundResult) => void;
   /** 판 위쪽 틀에 남은 카드 수를 알려준다 */
   onRemaining: (n: number) => void;
@@ -41,7 +43,7 @@ type Props = {
  * 암기 탭의 DrillRunner와 따로 둔 이유: 입력(순서 입력·3단 자가채점)과 속도 판정이 달라서다.
  * 출제 루프 자체는 session.ts를 그대로 공유한다.
  */
-export function RoundRunner({ items, mode, freshIds, onFinish, onRemaining }: Props) {
+export function RoundRunner({ items, mode, freshIds, showDegrees = true, onFinish, onRemaining }: Props) {
   const [session, setSession] = useState<Session>(() =>
     createSession(items, Date.now(), Math.random),
   );
@@ -286,6 +288,10 @@ export function RoundRunner({ items, mode, freshIds, onFinish, onRemaining }: Pr
             {chordSymbol(ROOT_NAMES[card.item.rootPc], card.item.quality, revealed ? 'full' : 'quiz')}
           </span>
           <span className="rounded-md border border-line px-2 py-0.5 text-base text-ivory-dim">{card.item.form}형</span>
+        </div>
+        {/* 도수 라벨 — 익숙해지면 끈다 (오늘 홈의 토글) */}
+        <div className="mt-1 h-5 text-sm tracking-widest text-brass">
+          {showDegrees ? chord.degrees.map(toGlyphs).join(' ') : ''}
         </div>
         <div className="mt-2 h-4 text-xs tracking-widest text-muted">
           {revealed ? `${keyLabel(card.ctx.keyPc, card.ctx.type)} · ${card.ctx.roman}` : ''}

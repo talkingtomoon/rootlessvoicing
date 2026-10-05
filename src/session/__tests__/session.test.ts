@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Item } from '../../engine/items';
-import { contextOf, itemId } from '../../engine/items';
+import { contextOf, itemId, itemsOf, sortByFourths } from '../../engine/items';
 import {
   answerCurrent,
   createSession,
@@ -21,6 +21,44 @@ function card(rootPc: number, quality: Item['quality'] = 'maj7', form: Item['for
 function ids(cards: SessionCard[]): string[] {
   return cards.map((c) => itemId(c.item));
 }
+
+describe('키 순서', () => {
+  it('4도 순환: quality 안에서 C F B♭ E♭ … 순', () => {
+    const sorted = sortByFourths(itemsOf('m7', 'A'));
+    expect(sorted.map((i) => i.rootPc)).toEqual([0, 5, 10, 3, 8, 1, 6, 11, 4, 9, 2, 7]);
+  });
+
+  it('quality가 섞이면 quality → 폼 → 4도권 순', () => {
+    const mixed = [
+      { rootPc: 5, quality: 'dom7' as const, form: 'A' as const },
+      { rootPc: 5, quality: 'm7' as const, form: 'A' as const },
+      { rootPc: 0, quality: 'm7' as const, form: 'A' as const },
+      { rootPc: 0, quality: 'm7' as const, form: 'B' as const },
+    ];
+    expect(sortByFourths(mixed).map((i) => `${i.rootPc}:${i.quality}:${i.form}`)).toEqual([
+      '0:m7:A',
+      '5:m7:A',
+      '0:m7:B',
+      '5:dom7:A',
+    ]);
+  });
+
+  it('keepOrder면 섞지 않고 받은 순서 그대로 낸다', () => {
+    const items = sortByFourths(itemsOf('maj7', 'A'));
+    const s = createSession(items, 0, Math.random, true);
+    const order = [s.current!, ...s.queue].map((c) => c.item.rootPc);
+    expect(order).toEqual(items.map((i) => i.rootPc));
+  });
+
+  it('기본은 섞는다', () => {
+    const items = sortByFourths(itemsOf('maj7', 'A'));
+    const same = Array.from({ length: 5 }, () => {
+      const s = createSession(items, 0, Math.random);
+      return [s.current!, ...s.queue].map((c) => c.item.rootPc).join();
+    });
+    expect(new Set(same).size).toBeGreaterThan(1);
+  });
+});
 
 describe('보관함 — 맞힐 때까지 남는다', () => {
   it('틀리면 몇 번이든 다시 나온다 (세 번 틀리고 네 번째에 맞혀야 빠진다)', () => {

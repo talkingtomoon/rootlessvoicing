@@ -16,7 +16,7 @@ import {
   weekOf,
   type TimeLog,
 } from '../state/day';
-import { loadInputMode, saveInputMode, type InputMode } from '../state/prefs';
+import { loadDegreeLabels, loadInputMode, saveDegreeLabels, saveInputMode, type InputMode } from '../state/prefs';
 import {
   curriculum,
   dueToday,
@@ -64,6 +64,7 @@ export function TodayView({ store, onStoreChange, settings }: Props) {
   const [day, setDay] = useState(studyDay);
   const [log, setLog] = useState<TimeLog>(loadTimeLog);
   const [mode, setMode] = useState<InputMode>(loadInputMode);
+  const [degreeLabels, setDegreeLabels] = useState(loadDegreeLabels);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [roundNo, setRoundNo] = useState(0);
   const [left, setLeft] = useState(0);
@@ -200,6 +201,7 @@ export function TodayView({ store, onStoreChange, settings }: Props) {
           items={plan.items}
           mode={mode}
           freshIds={plan.fresh.map(itemId)}
+          showDegrees={degreeLabels}
           onFinish={finishRound}
           onRemaining={setLeft}
         />
@@ -347,6 +349,18 @@ export function TodayView({ store, onStoreChange, settings }: Props) {
             onChange={(m) => {
               setMode(m);
               saveInputMode(m);
+            }}
+          />
+        </div>
+        <div className="flex items-center justify-center gap-2 text-xs text-muted">
+          도수 라벨
+          <Seg
+            options={['on', 'off']}
+            labels={['켬', '끔']}
+            value={degreeLabels ? 'on' : 'off'}
+            onChange={(v) => {
+              setDegreeLabels(v === 'on');
+              saveDegreeLabels(v === 'on');
             }}
           />
         </div>

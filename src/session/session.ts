@@ -36,9 +36,20 @@ export type Session = {
 
 export const SESSION_SIZES = [12, 30, 60, 120] as const;
 
-/** 문맥 라벨은 quality가 정한다(자리가 하나뿐). 풀을 거르는 건 enabledItems의 몫이다. */
-export function createSession(items: Item[], startedAt: number, rand: () => number): Session {
-  const cards: SessionCard[] = shuffle(items, rand).map((item) => ({
+/**
+ * 문맥 라벨은 quality가 정한다(자리가 하나뿐). 풀을 거르는 건 enabledItems의 몫이다.
+ *
+ * @param keepOrder true면 섞지 않고 받은 순서 그대로 낸다 (키 순서 '4도 순환').
+ *                  보관함에서 다시 나올 때의 간격 규칙은 그대로다.
+ */
+export function createSession(
+  items: Item[],
+  startedAt: number,
+  rand: () => number,
+  keepOrder = false,
+): Session {
+  const ordered = keepOrder ? [...items] : shuffle(items, rand);
+  const cards: SessionCard[] = ordered.map((item) => ({
     item,
     ctx: contextOf(item.rootPc, item.quality),
   }));

@@ -1,6 +1,7 @@
 import type { ChordQuality, Form, ProgressionType } from './types';
 import { QUALITIES } from './voicings';
 import { PROGRESSIONS } from './progressions';
+import { FOURTHS_ORDER } from './chord';
 
 /** SRS 항목 식별자: (rootPc, quality, form) — 고유 144개. 문맥(키·도수)은 식별자에 포함하지 않는다. */
 export type Item = {
@@ -35,6 +36,25 @@ export function allItems(): Item[] {
 /** 한 quality × form의 12루트 — 타입별 암기 모드의 출제 단위 */
 export function itemsOf(quality: ChordQuality, form: Form): Item[] {
   return Array.from({ length: 12 }, (_, rootPc) => ({ rootPc, quality, form }));
+}
+
+/**
+ * 키 순서 — 세션 시작 화면의 선택지.
+ * `fourths`: 재즈에서 코드가 실제로 움직이는 방향이고 손 이동이 작아 초반 학습에 유리하다 (기본)
+ * `random`: 익숙해진 뒤 쓰는 모드
+ */
+export type KeyOrder = 'fourths' | 'random';
+
+/** 4도권 순으로 줄 세운다. quality가 섞여 있으면 quality 안에서 4도권을 돈다. */
+export function sortByFourths(items: Item[]): Item[] {
+  const keyRank = new Map(FOURTHS_ORDER.map((pc, i) => [pc, i]));
+  const qRank = new Map(QUALITIES.map((q, i) => [q, i]));
+  return [...items].sort(
+    (a, b) =>
+      (qRank.get(a.quality) ?? 0) - (qRank.get(b.quality) ?? 0) ||
+      a.form.localeCompare(b.form) ||
+      (keyRank.get(a.rootPc) ?? 0) - (keyRank.get(b.rootPc) ?? 0),
+  );
 }
 
 export type ItemContext = {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Form } from '../engine/types';
-import { itemsOf } from '../engine/items';
+import { itemsOf, sortByFourths, type KeyOrder } from '../engine/items';
 import { selectItems, type ProgressStore } from '../state/progress';
 import { enabledItems, type Settings } from '../state/settings';
 import { QUALITIES } from '../engine/voicings';
@@ -16,8 +16,12 @@ import { SESSION_SIZES } from '../session/session';
 import {
   loadLastForm,
   loadLastMemorizeMode,
+  loadDegreeLabels,
+  loadKeyOrder,
   loadLastQuality,
   loadLastSessionSize,
+  saveDegreeLabels,
+  saveKeyOrder,
   saveLastForm,
   saveLastMemorizeMode,
   saveLastQuality,
@@ -44,6 +48,8 @@ export function MemorizeView({ store, onFinish, settings }: Props) {
   const [n, setN] = useState(loadLastSessionSize);
   const [quality, setQuality] = useState(loadLastQuality);
   const [form, setForm] = useState<Form>(loadLastForm);
+  const [keyOrder, setKeyOrder] = useState<KeyOrder>(loadKeyOrder);
+  const [degreeLabels, setDegreeLabels] = useState(loadDegreeLabels);
 
   /** 도수 드릴 풀 — 6 quality × 12루트 = 72개 (폼은 쓰지 않는다) */
   const degreePool = useMemo(() => degreeItems(), []);
@@ -92,9 +98,15 @@ export function MemorizeView({ store, onFinish, settings }: Props) {
   }, [running, mode, n, start]);
 
   if (running && mode === 'degree') {
+    const size = Math.min(n, degreePool.length);
     return (
       <DegreeRunner
-        draw={() => shuffle(degreePool, Math.random).slice(0, Math.min(n, degreePool.length))}
+        draw={() =>
+          keyOrder === 'fourths'
+            ? sortByFourths(degreePool).slice(0, size)
+            : shuffle(degreePool, Math.random).slice(0, size)
+        }
+        keepOrder={keyOrder === 'fourths'}
         onExit={() => setRunning(false)}
       />
     );
@@ -106,8 +118,10 @@ export function MemorizeView({ store, onFinish, settings }: Props) {
         draw={
           mode === 'all'
             ? () => selectItems(store, pool, n, Math.random, studyDay())
-            : () => itemsOf(quality, form)
+            : () => (keyOrder === 'fourths' ? sortByFourths(itemsOf(quality, form)) : itemsOf(quality, form))
         }
+        keepOrder={mode === 'type' && keyOrder === 'fourths'}
+        showDegrees={degreeLabels}
         onExit={() => setRunning(false)}
         onFinish={onFinish}
       />
@@ -250,6 +264,43 @@ export function MemorizeView({ store, onFinish, settings }: Props) {
           </button>
         </>
       )}
+
+      {/* 세션 옵션 — 세션 간 유지된다 */}
+      <div className="flex flex-col items-center gap-3 border-t border-line pt-6">
+        {mode !== 'all' && (
+          <label className="flex items-center gap-3 text-sm text-muted">
+            키 순서
+            <Seg
+              options={['fourths', 'random'] as KeyOrder[]}
+              labels={['4도 순환', '랜덤']}
+              value={keyOrder}
+              onChange={(o) => {
+                setKeyOrder(o);
+                saveKeyOrder(o);
+              }}
+            />
+          </label>
+        )}
+        {mode !== 'degree' && (
+          <label className="flex items-center gap-3 text-sm text-muted">
+            도수 라벨
+            <Seg
+              options={['on', 'off']}
+              labels={['켬', '끔']}
+              value={degreeLabels ? 'on' : 'off'}
+              onChange={(v) => {
+                setDegreeLabels(v === 'on');
+                saveDegreeLabels(v === 'on');
+              }}
+            />
+          </label>
+        )}
+        <p className="max-w-sm text-center text-xs text-muted">
+          {mode === 'all'
+            ? '전체는 늘 랜덤이다 — 4도로 줄 세우면 다음 루트가 예고된다'
+            : '4도 순환이 기본 — 코드가 실제로 움직이는 방향이고 손 이동이 작다'}
+        </p>
+      </div>
     </div>
   );
 }
