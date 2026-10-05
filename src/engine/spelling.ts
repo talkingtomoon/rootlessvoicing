@@ -45,9 +45,14 @@ function simplify(name: NoteName): NoteName {
   return name;
 }
 
+/** 도수 하나의 음이름 — 도수 기반 철자 + 겹임시표 단순화. 보이싱과 도수 드릴이 같은 글자를 쓰게 한다. */
+export function spellDegree(root: NoteName, degree: string, semitones: number): NoteName {
+  return simplify(spellInterval(root, degree, ((semitones % 12) + 12) % 12));
+}
+
 /** 보이싱 4음의 음이름 (낮은 성부부터), 도수 기반 철자 + 겹임시표 단순화 */
 export function spellVoicing(root: NoteName, voicing: Voicing): NoteName[] {
-  return voicing.intervals.map((iv, i) => simplify(spellInterval(root, voicing.degrees[i], iv % 12)));
+  return voicing.intervals.map((iv, i) => spellDegree(root, voicing.degrees[i], iv));
 }
 
 /** ASCII → 표시용 글리프 ('Db' → 'D♭', 'b3' → '♭3') */

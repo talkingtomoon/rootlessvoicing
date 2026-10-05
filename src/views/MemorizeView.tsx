@@ -7,6 +7,9 @@ import { QUALITIES } from '../engine/voicings';
 import { QUALITY_SYMBOL } from '../engine/format';
 import { ROOT_NAMES, toGlyphs } from '../engine/spelling';
 import { DrillRunner } from '../components/DrillRunner';
+import { DegreeRunner } from '../components/DegreeRunner';
+import { degreeItems } from '../engine/degrees';
+import { shuffle } from '../lib/shuffle';
 import { studyDay } from '../state/day';
 import { Seg } from '../components/Seg';
 import { SESSION_SIZES } from '../session/session';
@@ -19,9 +22,9 @@ import {
   saveLastMemorizeMode,
   saveLastQuality,
   saveLastSessionSize,
+  type MemorizeMode,
 } from '../state/prefs';
 
-export type MemorizeMode = 'all' | 'type';
 
 type Props = {
   store: ProgressStore;
@@ -30,9 +33,10 @@ type Props = {
 };
 
 /**
- * 테스트. 두 갈래 모두 같은 보관함 루프(DrillRunner)를 쓰고, 어떤 item을 낼지만 다르다.
+ * 테스트. 세 갈래 모두 같은 보관함 루프(session.ts)를 쓰고, 어떤 item을 낼지와 입력만 다르다.
  * - 전체: Leitner 우선순위로 N장 (간격 지난 것 → 신규 → 단계 낮은 순)
  * - 타입별: quality × form 하나의 12루트 한 바퀴 (선정 규칙을 건너뛰는 직접 지정)
+ * - 도수: 보이싱 앞 층. 코드 심볼 → 구성음을 루트부터 차례로 (72개, 진도에는 기록하지 않는다)
  */
 export function MemorizeView({ store, onFinish, settings }: Props) {
   const [mode, setMode] = useState<MemorizeMode>(loadLastMemorizeMode);
@@ -40,6 +44,9 @@ export function MemorizeView({ store, onFinish, settings }: Props) {
   const [n, setN] = useState(loadLastSessionSize);
   const [quality, setQuality] = useState(loadLastQuality);
   const [form, setForm] = useState<Form>(loadLastForm);
+
+  /** 도수 드릴 풀 — 6 quality × 12루트 = 72개 (폼은 쓰지 않는다) */
+  const degreePool = useMemo(() => degreeItems(), []);
 
   // '전체'가 뽑는 풀은 설정(진행·폼)이 정한다. '타입별'은 직접 지정이라 설정을 타지 않는다.
   const pool = useMemo(() => enabledItems(settings), [settings]);
@@ -84,6 +91,15 @@ export function MemorizeView({ store, onFinish, settings }: Props) {
     return () => window.removeEventListener('keydown', h);
   }, [running, mode, n, start]);
 
+  if (running && mode === 'degree') {
+    return (
+      <DegreeRunner
+        draw={() => shuffle(degreePool, Math.random).slice(0, Math.min(n, degreePool.length))}
+        onExit={() => setRunning(false)}
+      />
+    );
+  }
+
   if (running) {
     return (
       <DrillRunner
@@ -101,8 +117,8 @@ export function MemorizeView({ store, onFinish, settings }: Props) {
   return (
     <div className="mx-auto flex max-w-3xl flex-col items-center gap-7 px-4 py-10">
       <Seg
-        options={['all', 'type'] as MemorizeMode[]}
-        labels={['전체', '타입별']}
+        options={['all', 'type', 'degree'] as MemorizeMode[]}
+        labels={['전체', '타입별', '도수']}
         value={mode}
         onChange={(m) => {
           setMode(m);
@@ -110,7 +126,40 @@ export function MemorizeView({ store, onFinish, settings }: Props) {
         }}
       />
 
-      {mode === 'all' ? (
+      {mode === 'degree' ? (
+        <>
+          <div className="text-center">
+            <div className="text-xs tracking-widest text-muted">보이싱 앞 층 · 72개에서 랜덤</div>
+            <h2 className="mt-1 font-display text-3xl text-ivory">몇 장 돌릴까</h2>
+          </div>
+          <div className="flex gap-3">
+            {SESSION_SIZES.map((size, i) => {
+              const actual = Math.min(size, degreePool.length);
+              return (
+                <button
+                  key={size}
+                  onClick={() => start(size)}
+                  title={`단축키 ${i + 1}`}
+                  className={`flex h-20 w-20 flex-col items-center justify-center rounded-xl border font-display text-2xl transition-colors ${
+                    size === n
+                      ? 'border-brass bg-surface text-ivory'
+                      : 'border-line bg-felt-deep text-ivory-dim hover:border-muted'
+                  }`}
+                >
+                  {size}
+                  {actual < size && <span className="font-body text-[11px] text-muted">→ {actual}장</span>}
+                </button>
+              );
+            })}
+          </div>
+          <p className="max-w-sm text-center text-sm text-muted">
+            코드 심볼을 보고 구성음을 루트부터 차례로 찍는다. 한 옥타브 안에서 — 9는 2도 자리, 13은 6도 자리.
+          </p>
+          <p className="max-w-sm text-center text-xs text-muted">
+            루트를 빼면 그 코드의 보이싱 그 자체다. 진도(히트맵)에는 기록하지 않는다.
+          </p>
+        </>
+      ) : mode === 'all' ? (
         <>
           <div className="text-center">
             <div className="text-xs tracking-widest text-muted">{pool.length}개에서 랜덤</div>

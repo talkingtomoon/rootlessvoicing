@@ -44,11 +44,14 @@ export function saveLastOrder(o: 'fourths' | 'chromatic'): void {
   localStorage.setItem(LAST_ORDER_KEY, o);
 }
 
-export function loadLastMemorizeMode(): 'all' | 'type' {
-  return localStorage.getItem(LAST_MEMORIZE_MODE_KEY) === 'type' ? 'type' : 'all';
+export type MemorizeMode = 'all' | 'type' | 'degree';
+
+export function loadLastMemorizeMode(): MemorizeMode {
+  const v = localStorage.getItem(LAST_MEMORIZE_MODE_KEY);
+  return v === 'type' || v === 'degree' ? v : 'all';
 }
 
-export function saveLastMemorizeMode(m: 'all' | 'type'): void {
+export function saveLastMemorizeMode(m: MemorizeMode): void {
   localStorage.setItem(LAST_MEMORIZE_MODE_KEY, m);
 }
 
