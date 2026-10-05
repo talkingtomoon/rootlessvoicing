@@ -18,9 +18,8 @@ export const PROGRESSIONS: Record<ProgressionType, ProgressionSlot[]> = {
   ],
   minor: [
     { roman: 'ii∅', rootOffset: 2, quality: 'm7b5' },
-    { roman: 'V', rootOffset: 7, quality: 'dom7b9' },
-    // 마이너 i는 9음을 품지만 표기는 m7로 통일한다 (메이저 ii와 같은 라벨)
-    { roman: 'i', rootOffset: 0, quality: 'm7' },
+    { roman: 'V', rootOffset: 7, quality: 'dom7b9b13' },
+    { roman: 'i', rootOffset: 0, quality: 'm6' },
   ],
 };
 

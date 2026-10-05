@@ -7,7 +7,6 @@ import { chordSymbol, keyLabel } from '../engine/format';
 import { playChord, playNote } from '../audio/audio';
 import { Keyboard, type KeyHighlight } from './Keyboard';
 import { answerCurrent, createSession, remaining, summarize, type Session } from '../session/session';
-import type { ProgressionType } from '../engine/types';
 
 /** 문제 상태: 입력 중 → (정답 보기) 자가채점 대기 → 채점 완료 */
 type QuizPhase = 'input' | 'reveal' | 'graded';
@@ -19,8 +18,6 @@ type Props = {
   onExit: () => void;
   /** 세션이 끝났을 때 item별 첫 시도 결과를 넘긴다 (Leitner 갱신용). 세션당 한 번만 호출된다. */
   onFinish?: (firstTry: Record<string, boolean>) => void;
-  /** 켜둔 진행만 출제 문맥으로 쓴다 */
-  allowedTypes?: ProgressionType[];
 };
 
 function itemLabel(item: Item): string {
@@ -35,9 +32,9 @@ function findItem(id: string): Item | null {
  * 보관함 루프 실행부 — 암기/타입별 모드가 공유한다.
  * 어떤 item을 낼지는 draw()가 정하고, 여기서는 출제·채점·집계만 한다.
  */
-export function DrillRunner({ draw, onExit, onFinish, allowedTypes }: Props) {
+export function DrillRunner({ draw, onExit, onFinish }: Props) {
   const [session, setSession] = useState<Session>(() =>
-    createSession(draw(), Date.now(), Math.random, allowedTypes),
+    createSession(draw(), Date.now(), Math.random),
   );
   const [phase, setPhase] = useState<QuizPhase>('input');
   /** 이 카드에 실제로 적용될 결과 (정정 후 값) */
@@ -65,7 +62,7 @@ export function DrillRunner({ draw, onExit, onFinish, allowedTypes }: Props) {
   }, [session, onFinish]);
 
   function restart() {
-    setSession(createSession(draw(), Date.now(), Math.random, allowedTypes));
+    setSession(createSession(draw(), Date.now(), Math.random));
     setPhase('input');
     setLastCorrect(null);
     setAutoCorrect(null);

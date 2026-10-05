@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Item } from '../../engine/items';
-import { contextsFor, itemId } from '../../engine/items';
+import { contextOf, itemId } from '../../engine/items';
 import {
   answerCurrent,
   createSession,
@@ -15,7 +15,7 @@ const rand0 = () => 0;
 
 function card(rootPc: number, quality: Item['quality'] = 'maj7', form: Item['form'] = 'A'): SessionCard {
   const item = { rootPc, quality, form };
-  return { item, ctx: contextsFor(rootPc, quality)[0] };
+  return { item, ctx: contextOf(rootPc, quality) };
 }
 
 function ids(cards: SessionCard[]): string[] {

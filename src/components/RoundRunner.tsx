@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { itemId, type Item, type ItemId } from '../engine/items';
-import type { ProgressionType } from '../engine/types';
 import { buildChord } from '../engine/chord';
 import { chordSymbol, keyLabel } from '../engine/format';
 import { gradeSequence, stackAscending } from '../engine/grading';
@@ -21,7 +20,6 @@ export type RoundResult = {
 
 type Props = {
   items: Item[];
-  allowedTypes: ProgressionType[];
   mode: InputMode;
   /** 이번 판에 처음 배운 item — 카드에 '새' 표시 */
   freshIds: ItemId[];
@@ -42,9 +40,9 @@ type Props = {
  * 암기 탭의 DrillRunner와 따로 둔 이유: 입력(순서 입력·3단 자가채점)과 속도 판정이 달라서다.
  * 출제 루프 자체는 session.ts를 그대로 공유한다.
  */
-export function RoundRunner({ items, allowedTypes, mode, freshIds, onFinish, onRemaining }: Props) {
+export function RoundRunner({ items, mode, freshIds, onFinish, onRemaining }: Props) {
   const [session, setSession] = useState<Session>(() =>
-    createSession(items, Date.now(), Math.random, allowedTypes),
+    createSession(items, Date.now(), Math.random),
   );
   type Phase = 'input' | 'reveal' | 'graded';
   const [phase, setPhase] = useState<Phase>('input');

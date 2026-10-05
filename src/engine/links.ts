@@ -74,8 +74,15 @@ export function progressionLinks(keyPc: number, type: ProgressionType, form: For
   return out;
 }
 
-/** 마이너 코드의 메이저 짝: m7♭5 ← m7, 7♭9 ← 7 (같은 루트·같은 폼) */
-const MAJOR_SIBLING: Partial<Record<ChordQuality, ChordQuality>> = { m7b5: 'm7', dom7b9: 'dom7' };
+/**
+ * 마이너 코드의 메이저 짝 (같은 루트·같은 폼): m7♭5 ← m7, 7♭9♭13 ← 7, m6 ← m7.
+ * 전부 한두 성부만 내리면 되는 관계라 외울 때 기댈 데가 된다.
+ */
+const MAJOR_SIBLING: Partial<Record<ChordQuality, ChordQuality>> = {
+  m7b5: 'm7',
+  dom7b9b13: 'dom7',
+  m6: 'm7',
+};
 
 /** 같은 루트에서 두 음만 내리면 되는 메이저 짝 (없으면 null) */
 export function majorSiblingOf(quality: ChordQuality): ChordQuality | null {

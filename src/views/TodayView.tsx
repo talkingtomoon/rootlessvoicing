@@ -198,7 +198,6 @@ export function TodayView({ store, onStoreChange, settings }: Props) {
         <RoundRunner
           key={roundNo}
           items={plan.items}
-          allowedTypes={types}
           mode={mode}
           freshIds={plan.fresh.map(itemId)}
           onFinish={finishRound}

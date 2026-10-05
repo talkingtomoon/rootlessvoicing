@@ -4,7 +4,7 @@ import { emptyProgress, MAX_LEVEL, type ProgressStore } from './progress';
 /**
  * 진도를 URL에 실을 수 있는 짧은 코드로 만든다. 서버 없이 기기 사이를 옮기는 유일한 통로.
  *
- * 형식 (123바이트 → base64url 164자):
+ * 형식 (버전 2 = 3 + 144바이트):
  *   [0]    버전
  *   [1..2] 세션 번호 (LE, 0..65535로 clamp)
  *   [3..]  item당 1바이트 — 상위 3비트 = 단계(0=미학습, 1..5), 하위 5비트 = 나이
@@ -16,9 +16,36 @@ import { emptyProgress, MAX_LEVEL, type ProgressStore } from './progress';
  * item 순서는 allItems() 순서이고 **이 순서가 포맷의 일부다** — 바꾸면 옛 코드가 깨진다.
  */
 
-const VERSION = 1;
+const VERSION = 2;
 const MAX_AGE = 31;
-const BYTES = 3 + 120;
+const BYTES = 3 + 144;
+
+/**
+ * 버전 1(quality 5개 · 120항목) 링크도 읽어준다 — 스펙 개정 전에 만든 링크를 버리지 않는다.
+ * 그때의 item 순서가 포맷이었으므로 그 순서를 여기 박아둔다.
+ * `dom7b9`는 7♭9♭13으로 구성음이 바뀌었으므로 **가져오지 않는다**(다른 코드다. 새로 배우는 게 맞다).
+ */
+const V1_BYTES = 3 + 120;
+const V1_QUALITIES = ['m7', 'dom7', 'maj7', 'm7b5', 'dom7b9'] as const;
+const V1_DROPPED = 'dom7b9';
+
+function decodeV1(bytes: Uint8Array): ProgressStore {
+  const session = bytes[1] | (bytes[2] << 8);
+  const store: ProgressStore = { ...emptyProgress(), session, items: {} };
+  let i = 0;
+  for (let rootPc = 0; rootPc < 12; rootPc++) {
+    for (const quality of V1_QUALITIES) {
+      for (const form of ['A', 'B'] as const) {
+        const byte = bytes[3 + i++];
+        const level = byte >> 5;
+        if (level === 0 || level > MAX_LEVEL) continue;
+        if (quality === V1_DROPPED) continue;
+        store.items[`${rootPc}:${quality}:${form}`] = { level, lastSeenSession: session - (byte & 0x1f) };
+      }
+    }
+  }
+  return store;
+}
 
 function toBase64Url(bytes: Uint8Array): string {
   let bin = '';
@@ -57,7 +84,9 @@ export function encodeProgress(store: ProgressStore): string {
 /** 형식이 어긋나면 null — 잘못 붙여넣은 코드로 진도를 날리지 않는다 */
 export function decodeProgress(code: string): ProgressStore | null {
   const bytes = fromBase64Url(code.trim());
-  if (!bytes || bytes.length !== BYTES || bytes[0] !== VERSION) return null;
+  if (!bytes) return null;
+  if (bytes[0] === 1 && bytes.length === V1_BYTES) return decodeV1(bytes);
+  if (bytes.length !== BYTES || bytes[0] !== VERSION) return null;
 
   const session = bytes[1] | (bytes[2] << 8);
   const store: ProgressStore = { ...emptyProgress(), session, items: {} };

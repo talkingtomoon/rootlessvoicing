@@ -152,11 +152,11 @@ describe('히트맵 조회', () => {
     expect(levelOf(storeWith([[a, 3, 1]]), a)).toBe(3);
   });
 
-  it('히트맵 한 칸 = item 하나 (12루트 × 5quality × 2폼 = 120)', () => {
+  it('히트맵 한 칸 = item 하나 (12루트 × 6quality × 2폼 = 144)', () => {
     const cells = (['A', 'B'] as const).flatMap((form) =>
-      (['m7', 'dom7', 'maj7', 'm7b5', 'dom7b9'] as const).flatMap((q) => itemsOf(q, form)),
+      (['m7', 'dom7', 'maj7', 'm7b5', 'dom7b9b13', 'm6'] as const).flatMap((q) => itemsOf(q, form)),
     );
-    expect(cells).toHaveLength(120);
-    expect(new Set(cells.map(itemId)).size).toBe(120);
+    expect(cells).toHaveLength(144);
+    expect(new Set(cells.map(itemId)).size).toBe(144);
   });
 });

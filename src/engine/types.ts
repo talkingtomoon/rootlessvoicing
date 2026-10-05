@@ -1,4 +1,4 @@
-export type ChordQuality = 'm7' | 'dom7' | 'maj7' | 'm7b5' | 'dom7b9';
+export type ChordQuality = 'm7' | 'dom7' | 'maj7' | 'm7b5' | 'dom7b9b13' | 'm6';
 
 export type Form = 'A' | 'B';
 

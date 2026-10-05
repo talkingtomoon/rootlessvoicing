@@ -1,6 +1,5 @@
-import type { ProgressionType } from '../engine/types';
 import type { Item, ItemContext, ItemId } from '../engine/items';
-import { contextsFor, itemId } from '../engine/items';
+import { contextOf, itemId } from '../engine/items';
 import { shuffle } from '../lib/shuffle';
 
 /**
@@ -37,22 +36,12 @@ export type Session = {
 
 export const SESSION_SIZES = [12, 30, 60, 120] as const;
 
-/**
- * @param allowedTypes 켜둔 진행만 문맥으로 쓴다 (m7은 메이저 ii / 마이너 i 중 택일).
- *                     해당 문맥이 하나도 없으면 필터를 무시한다.
- */
-export function createSession(
-  items: Item[],
-  startedAt: number,
-  rand: () => number,
-  allowedTypes?: ProgressionType[],
-): Session {
-  const cards: SessionCard[] = shuffle(items, rand).map((item) => {
-    const all = contextsFor(item.rootPc, item.quality);
-    const allowed = allowedTypes ? all.filter((c) => allowedTypes.includes(c.type)) : all;
-    const ctxs = allowed.length > 0 ? allowed : all;
-    return { item, ctx: ctxs[Math.floor(rand() * ctxs.length)] };
-  });
+/** 문맥 라벨은 quality가 정한다(자리가 하나뿐). 풀을 거르는 건 enabledItems의 몫이다. */
+export function createSession(items: Item[], startedAt: number, rand: () => number): Session {
+  const cards: SessionCard[] = shuffle(items, rand).map((item) => ({
+    item,
+    ctx: contextOf(item.rootPc, item.quality),
+  }));
   const [current, ...queue] = cards;
   return {
     queue,

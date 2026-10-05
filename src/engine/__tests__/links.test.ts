@@ -8,12 +8,14 @@ describe('모양', () => {
     expect(shapeGaps('maj7', 'A')).toEqual([3, 4, 3]);
     expect(shapeGaps('dom7', 'A')).toEqual([4, 2, 5]);
     expect(shapeGaps('m7b5', 'A')).toEqual([3, 4, 2]);
-    expect(shapeGaps('dom7b9', 'A')).toEqual([3, 3, 3]);
+    expect(shapeGaps('dom7b9b13', 'A')).toEqual([3, 3, 4]);
+    expect(shapeGaps('m6', 'A')).toEqual([4, 2, 5]);
   });
   it('B형 간격', () => {
     expect(shapeGaps('m7', 'B')).toEqual([4, 1, 4]);
     expect(shapeGaps('dom7', 'B')).toEqual([5, 1, 4]);
-    expect(shapeGaps('dom7b9', 'B')).toEqual([3, 3, 3]);
+    expect(shapeGaps('dom7b9b13', 'B')).toEqual([4, 2, 3]);
+    expect(shapeGaps('m6', 'B')).toEqual([5, 1, 4]);
   });
   it('맨 아래 도수', () => {
     expect(bottomDegree('m7', 'A')).toBe('b3');
@@ -32,17 +34,28 @@ describe('진행 연결', () => {
     expect(movedLabels(toI.moves)).toEqual(['F→E', 'A→G', 'E→D']);
   });
 
-  it('ii→V는 12키 × 메이저/마이너 × A/B 모두 한 음만 반음 내려간다', () => {
+  it('메이저 ii→V는 12키 × A/B 모두 한 음만 반음 내려간다', () => {
     for (let k = 0; k < 12; k++) {
-      for (const type of ['major', 'minor'] as const) {
-        for (const form of ['A', 'B'] as const) {
-          const [link] = progressionLinks(k, type, form, 0);
-          const moved = link.moves.filter((m) => m.delta !== 0);
-          expect(moved).toHaveLength(1);
-          expect(moved[0].delta).toBe(-1);
-        }
+      for (const form of ['A', 'B'] as const) {
+        const [link] = progressionLinks(k, 'major', form, 0);
+        const moved = link.moves.filter((m) => m.delta !== 0);
+        expect(moved).toHaveLength(1);
+        expect(moved[0].delta).toBe(-1);
       }
     }
+  });
+
+  // 마이너는 ♭13 때문에 한 음이 더 움직인다 (♭7은 제자리, 9→♭13으로 올라간다)
+  it('마이너 ii∅→V는 두 음, 각 1반음', () => {
+    for (let k = 0; k < 12; k++) {
+      for (const form of ['A', 'B'] as const) {
+        const [link] = progressionLinks(k, 'minor', form, 0);
+        const moved = link.moves.filter((m) => m.delta !== 0);
+        expect(moved).toHaveLength(2);
+        expect(moved.every((m) => Math.abs(m.delta) === 1)).toBe(true);
+      }
+    }
+    expect(movedLabels(progressionLinks(0, 'minor', 'A', 0)[0].moves)).toEqual(['C→B', 'D→E♭']);
   });
 
   it('움직임 표시엔 E♯·B♯ 대신 건반 이름 (C♯ major A형 V→I)', () => {
@@ -50,17 +63,18 @@ describe('진행 연결', () => {
     expect(movedLabels(prev.moves)).toEqual(['G♭→F', 'B♭→G♯', 'F→D♯']);
   });
 
-  it('C minor A형: G7♭9→Cm7', () => {
+  it('C minor A형: G7♭9♭13→Cm6은 네 성부가 다 움직인다 (각 1~2반음)', () => {
     const [prev] = progressionLinks(0, 'minor', 'A', 2);
-    expect(movedLabels(prev.moves)).toEqual(['F→E♭', 'A♭→G', 'B→B♭']);
+    expect(movedLabels(prev.moves)).toEqual(['F→E♭', 'A♭→G', 'B→A', 'E♭→D']);
+    expect(prev.moves.every((m) => Math.abs(m.delta) <= 2)).toBe(true);
   });
 });
 
 describe('형제 연결', () => {
-  it('m7→m7♭5, 7→7♭9: 12루트 × A/B 모두 2·4번째 성부만 내려간다', () => {
+  it('m7→m7♭5, 7→7♭9♭13: 12루트 × A/B 모두 2·4번째 성부만 내려간다', () => {
     for (let r = 0; r < 12; r++) {
       for (const form of ['A', 'B'] as const) {
-        for (const q of ['m7b5', 'dom7b9'] as const) {
+        for (const q of ['m7b5', 'dom7b9b13'] as const) {
           const link = siblingLink(r, q, form)!;
           const idx = link.moves.flatMap((m, i) => (m.delta !== 0 ? [i] : []));
           expect(idx).toEqual([1, 3]);
@@ -70,8 +84,19 @@ describe('형제 연결', () => {
     }
     expect(movedLabels(siblingLink(2, 'm7b5', 'A')!.moves)).toEqual(['A→A♭', 'E→D']);
   });
+
+  it('m7→m6은 ♭7 한 음만 반음 내린다', () => {
+    for (let r = 0; r < 12; r++) {
+      for (const form of ['A', 'B'] as const) {
+        const moved = siblingLink(r, 'm6', form)!.moves.filter((m) => m.delta !== 0);
+        expect(moved).toHaveLength(1);
+        expect(moved[0].delta).toBe(-1);
+      }
+    }
+    expect(movedLabels(siblingLink(0, 'm6', 'A')!.moves)).toEqual(['B♭→A']);
+  });
   it('메이저 계열은 형제가 없다', () => {
-    for (const q of QUALITIES.filter((q) => q !== 'm7b5' && q !== 'dom7b9')) {
+    for (const q of QUALITIES.filter((q) => !['m7b5', 'dom7b9b13', 'm6'].includes(q))) {
       expect(siblingLink(0, q, 'A')).toBeNull();
     }
   });

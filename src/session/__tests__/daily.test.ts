@@ -55,11 +55,11 @@ describe('코스 — 같은 모양을 세 루트로', () => {
     ]);
   });
 
-  it('40유닛이 120개를 중복 없이 덮는다', () => {
-    expect(units).toHaveLength(40);
+  it('48유닛이 144개를 중복 없이 덮는다', () => {
+    expect(units).toHaveLength(48);
     const ids = units.flatMap((u) => u.items.map(itemId));
-    expect(new Set(ids).size).toBe(120);
-    expect(ids).toHaveLength(120);
+    expect(new Set(ids).size).toBe(144);
+    expect(ids).toHaveLength(144);
   });
 
   it('한 유닛은 같은 quality × 폼, 세 루트', () => {
@@ -78,18 +78,18 @@ describe('코스 — 같은 모양을 세 루트로', () => {
     expect(units[3].keys).toEqual(BLOCKS[1]);
   });
 
-  it('폼당 quality는 한 번만 — 마이너 i(m7)는 메이저 ii에서 이미 배운다', () => {
+  it('마이너 i가 m6이 되면서 겹치는 quality가 없다 — 폼당 24유닛', () => {
     const aMajor = units.filter((u) => u.form === 'A' && u.type === 'major');
     const aMinor = units.filter((u) => u.form === 'A' && u.type === 'minor');
     expect(aMajor).toHaveLength(12);
-    expect(aMinor).toHaveLength(8);
-    expect(new Set(aMinor.map((u) => u.quality))).toEqual(new Set(['m7b5', 'dom7b9']));
+    expect(aMinor).toHaveLength(12);
+    expect(new Set(aMinor.map((u) => u.quality))).toEqual(new Set(['m7b5', 'dom7b9b13', 'm6']));
   });
 
   it('메이저를 끄면 m7을 마이너 단계에서 가르친다', () => {
     const onlyMinor = curriculum(['A'], ['minor']);
     expect(onlyMinor).toHaveLength(12);
-    expect(new Set(onlyMinor.map((u) => u.quality))).toEqual(new Set(['m7b5', 'dom7b9', 'm7']));
+    expect(new Set(onlyMinor.map((u) => u.quality))).toEqual(new Set(['m7b5', 'dom7b9b13', 'm6']));
   });
 });
 
@@ -157,8 +157,8 @@ describe('하루하루 흐름', () => {
     const day2 = runDay(store, '2026-10-02');
     store = day2.store;
     const q2 = new Set(day2.learned.map((it) => it.quality));
-    expect(q2.has('dom7')).toBe(true);
-    expect(q2.has('maj7')).toBe(false);
+    expect(q2.has('dom7')).toBe(true); // ii가 굳었으니 V가 들어온다
+    expect(q2.has('maj7')).toBe(false); // I는 V가 굳어야 들어온다
 
     const day3 = runDay(store, '2026-10-03');
     expect(new Set(day3.learned.map((it) => it.quality)).has('maj7')).toBe(true);

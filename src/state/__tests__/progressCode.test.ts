@@ -22,12 +22,12 @@ describe('진도 코드', () => {
     const store = storeOf(40, [
       [0, 1, 40],
       [7, 3, 38],
-      [119, 5, 25],
+      [143, 5, 25],
     ]);
     expect(decodeProgress(encodeProgress(store))).toEqual(store);
   });
 
-  it('120개 전부 학습된 상태도 왕복된다', () => {
+  it('144개 전부 학습된 상태도 왕복된다', () => {
     let store = emptyProgress();
     const firstTry: Record<string, boolean> = {};
     for (const it of allItems()) firstTry[itemId(it)] = true;
@@ -35,13 +35,13 @@ describe('진도 코드', () => {
     expect(decodeProgress(encodeProgress(store))).toEqual(store);
   });
 
-  it('URL에 넣을 만큼 짧다 (200자 미만)', () => {
+  it('URL에 넣을 만큼 짧다 (220자 미만)', () => {
     let store = emptyProgress();
     const firstTry: Record<string, boolean> = {};
     for (const it of allItems()) firstTry[itemId(it)] = true;
     store = applyResults(store, firstTry);
     const code = encodeProgress(store);
-    expect(code.length).toBeLessThan(200);
+    expect(code.length).toBeLessThan(220);
     expect(code).toMatch(/^[A-Za-z0-9_-]+$/); // URL-safe
   });
 
@@ -65,7 +65,7 @@ describe('진도 코드', () => {
   });
 
   it('버전이 다르면 null', () => {
-    const bytes = new Uint8Array(123);
+    const bytes = new Uint8Array(147);
     bytes[0] = 99;
     let bin = '';
     for (const b of bytes) bin += String.fromCharCode(b);
@@ -75,9 +75,38 @@ describe('진도 코드', () => {
 
   it('item 순서는 포맷의 일부 — 바뀌면 옛 코드가 깨진다', () => {
     const all = allItems();
-    expect(all).toHaveLength(120);
+    expect(all).toHaveLength(144);
     expect(itemId(all[0])).toBe('0:m7:A');
-    expect(itemId(all[119])).toBe('11:dom7b9:B');
+    expect(itemId(all[143])).toBe('11:m6:B');
+  });
+
+  // 스펙 개정(quality 5→6) 전에 만든 링크도 읽어준다
+  it('버전 1 링크도 읽는다 — 7♭9만 버리고 나머지는 단계·나이 그대로', () => {
+    const V1_QUALITIES = ['m7', 'dom7', 'maj7', 'm7b5', 'dom7b9'];
+    const bytes = new Uint8Array(123);
+    bytes[0] = 1;
+    bytes[1] = 6; // 세션 6
+    const put = (rootPc: number, quality: string, form: string, level: number, age: number) => {
+      const qi = V1_QUALITIES.indexOf(quality);
+      const idx = rootPc * 10 + qi * 2 + (form === 'A' ? 0 : 1);
+      bytes[3 + idx] = (level << 5) | age;
+    };
+    put(0, 'm7', 'A', 5, 1);
+    put(2, 'm7b5', 'A', 3, 1);
+    put(7, 'dom7', 'A', 4, 1);
+    put(0, 'dom7b9', 'A', 2, 0); // 구성음이 바뀐 코드 — 가져오지 않는다
+    let bin = '';
+    for (const b of bytes) bin += String.fromCharCode(b);
+    const code = btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+    const store = decodeProgress(code)!;
+    expect(store.session).toBe(6);
+    expect(store.items['0:m7:A']).toEqual({ level: 5, lastSeenSession: 5 });
+    expect(store.items['2:m7b5:A']).toEqual({ level: 3, lastSeenSession: 5 });
+    expect(store.items['7:dom7:A']).toEqual({ level: 4, lastSeenSession: 5 });
+    expect(store.items['0:dom7b9:A']).toBeUndefined();
+    expect(store.items['0:dom7b9b13:A']).toBeUndefined();
+    expect(Object.keys(store.items)).toHaveLength(3);
   });
 
   it('parsePasted: 링크 전체든 코드만이든, 출처가 달라도 읽는다', () => {

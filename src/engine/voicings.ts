@@ -1,14 +1,21 @@
 import type { ChordQuality, Form, Voicing } from './types';
 
-export const QUALITIES: ChordQuality[] = ['m7', 'dom7', 'maj7', 'm7b5', 'dom7b9'];
+export const QUALITIES: ChordQuality[] = ['m7', 'dom7', 'maj7', 'm7b5', 'dom7b9b13', 'm6'];
 
-/** A형만 소스 데이터. B형은 getVoicing에서 파생한다. */
+/**
+ * A형만 소스 데이터. B형은 getVoicing에서 파생한다.
+ *
+ * **m7b5가 9가 아니라 루트(1)를 품는 것은 의도된 것이다.** 9를 넣으면 루트에 대해 단9도 불협이 생긴다.
+ * Bill Evans 계열 교재가 명시하는 알려진 예외다(Earl MacDonald의 차트도 하프 디미니시드 A·B 포지션에
+ * 루트가 들어간다고 적는다). "rootless인데 루트가 있다"는 이유로 고치지 마라.
+ */
 const A_FORMS: Record<ChordQuality, { intervals: number[]; degrees: string[] }> = {
   m7: { intervals: [3, 7, 10, 14], degrees: ['b3', '5', 'b7', '9'] },
   dom7: { intervals: [10, 14, 16, 21], degrees: ['b7', '9', '3', '13'] },
   maj7: { intervals: [4, 7, 11, 14], degrees: ['3', '5', '7', '9'] },
   m7b5: { intervals: [3, 6, 10, 12], degrees: ['b3', 'b5', 'b7', '1'] },
-  dom7b9: { intervals: [10, 13, 16, 19], degrees: ['b7', 'b9', '3', '5'] },
+  dom7b9b13: { intervals: [10, 13, 16, 20], degrees: ['b7', 'b9', '3', 'b13'] },
+  m6: { intervals: [3, 7, 9, 14], degrees: ['b3', '5', '6', '9'] },
 };
 
 export function getVoicing(quality: ChordQuality, form: Form): Voicing {

@@ -2,7 +2,7 @@ import type { ChordQuality, Form, ProgressionType } from './types';
 import { QUALITIES } from './voicings';
 import { PROGRESSIONS } from './progressions';
 
-/** SRS 항목 식별자: (rootPc, quality, form) — 고유 120개. 문맥(키·도수)은 식별자에 포함하지 않는다. */
+/** SRS 항목 식별자: (rootPc, quality, form) — 고유 144개. 문맥(키·도수)은 식별자에 포함하지 않는다. */
 export type Item = {
   rootPc: number;
   quality: ChordQuality;
@@ -44,18 +44,17 @@ export type ItemContext = {
 };
 
 /**
- * 이 item이 출제될 수 있는 문맥 목록. PROGRESSIONS에서 파생하므로 진행 정의만 고치면 따라온다.
- * m7만 두 개(메이저 ii / 마이너 i) — 의도된 것.
- * 출제 시 이 중 하나를 무작위로 골라 라벨을 붙인다.
+ * 이 item의 출제 문맥. PROGRESSIONS에서 파생하므로 진행 정의만 고치면 따라온다.
+ * **quality마다 자리가 하나뿐이다** — 마이너 i가 m6이 되면서 m7의 이중 문맥(메이저 ii / 마이너 i)이 사라졌다.
+ * 정의가 어긋나 자리를 못 찾으면 메이저 ii로 떨어진다(카드가 사라지는 것보다 낫다).
  */
-export function contextsFor(rootPc: number, quality: ChordQuality): ItemContext[] {
+export function contextOf(rootPc: number, quality: ChordQuality): ItemContext {
   const pc = ((rootPc % 12) + 12) % 12;
-  const out: ItemContext[] = [];
   for (const type of ['major', 'minor'] as ProgressionType[]) {
     for (const slot of PROGRESSIONS[type]) {
       if (slot.quality !== quality) continue;
-      out.push({ type, keyPc: ((pc - slot.rootOffset) % 12 + 12) % 12, roman: slot.roman });
+      return { type, keyPc: ((pc - slot.rootOffset) % 12 + 12) % 12, roman: slot.roman };
     }
   }
-  return out;
+  return { type: 'major', keyPc: pc, roman: PROGRESSIONS.major[0].roman };
 }

@@ -1,5 +1,5 @@
 import type { Form, ProgressionType } from '../engine/types';
-import { allItems, contextsFor, type Item } from '../engine/items';
+import { allItems, contextOf, type Item } from '../engine/items';
 
 /**
  * 설정은 이것뿐이다 (스펙 §7). 여기에 항목을 더 넣지 마라.
@@ -56,14 +56,12 @@ export function enabledForms(s: Settings): Form[] {
 
 /**
  * 암기 '전체'가 뽑을 수 있는 item 풀.
- * quality는 문맥으로 판정한다 — m7은 메이저 ii이자 마이너 i라 어느 한쪽만 켜도 남는다.
+ * quality는 문맥으로 판정한다 — 이제 quality마다 자리가 하나라 진행을 끄면 그 세 quality가 통째로 빠진다.
  */
 export function enabledItems(s: Settings): Item[] {
   const types = enabledTypes(s);
   const forms = enabledForms(s);
   return allItems().filter(
-    (it) =>
-      forms.includes(it.form) &&
-      contextsFor(it.rootPc, it.quality).some((c) => types.includes(c.type)),
+    (it) => forms.includes(it.form) && types.includes(contextOf(it.rootPc, it.quality).type),
   );
 }

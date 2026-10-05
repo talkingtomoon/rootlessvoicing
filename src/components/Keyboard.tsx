@@ -49,8 +49,8 @@ function buildKeys(from: number, to: number): { keys: KeyGeom[]; width: number }
 /** 좁은 화면에서 한 번에 보여줄 반음 수 (한 옥타브 + 위 C) */
 const PAGE_SPAN = 12;
 
-/** 기본 범위 F2–C5 = 채점 허용 범위(GRADE_MIN..GRADE_MAX)와 정확히 일치시킨다 */
-export function Keyboard({ from = 41, to = 72, highlights = [], onKeyPress, paged = true }: Props) {
+/** 기본 범위 C2–B4 = 채점 허용 범위(GRADE_MIN..GRADE_MAX)와 정확히 일치시킨다 */
+export function Keyboard({ from = 36, to = 71, highlights = [], onKeyPress, paged = true }: Props) {
   const [pressed, setPressed] = useState<number | null>(null);
   const releaseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const narrow = useMediaQuery(NARROW) && paged;

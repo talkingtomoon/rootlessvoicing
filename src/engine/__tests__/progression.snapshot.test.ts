@@ -27,19 +27,19 @@ describe('placeProgression 스냅샷 (12키 × major/minor × A/B)', () => {
       [52, 55, 59, 62], // Cmaj7 = E3 G3 B3 D4
     ]);
     expect(PROGRESSION_SNAPSHOT['major:B:0']).toEqual([
-      [48, 52, 53, 57], // Dm7  = C3 E3 F3 A3
-      [47, 52, 53, 57], // G7   = B2 E3 F3 A3
-      [47, 50, 52, 55], // Cmaj7 = B2 D3 E3 G3
+      [60, 64, 65, 69], // Dm7  = C4 E4 F4 A4
+      [59, 64, 65, 69], // G7   = B3 E4 F4 A4
+      [59, 62, 64, 67], // Cmaj7 = B3 D4 E4 G4
     ]);
     expect(PROGRESSION_SNAPSHOT['minor:A:0']).toEqual([
-      [53, 56, 60, 62], // Dm7b5 = F3 Ab3 C4 D4
-      [53, 56, 59, 62], // G7b9  = F3 Ab3 B3 D4
-      [51, 55, 58, 62], // Cm9   = Eb3 G3 Bb3 D4
+      [53, 56, 60, 62], // Dm7b5   = F3 Ab3 C4 D4
+      [53, 56, 59, 63], // G7b9b13 = F3 Ab3 B3 Eb4
+      [51, 55, 57, 62], // Cm6     = Eb3 G3 A3 D4
     ]);
     expect(PROGRESSION_SNAPSHOT['minor:B:0']).toEqual([
-      [48, 50, 53, 56], // Dm7b5 = C3 D3 F3 Ab3
-      [47, 50, 53, 56], // G7b9  = B2 D3 F3 Ab3
-      [46, 50, 51, 55], // Cm9   = Bb2 D3 Eb3 G3
+      [60, 62, 65, 68], // Dm7b5   = C4 D4 F4 Ab4
+      [59, 63, 65, 68], // G7b9b13 = B3 Eb4 F4 Ab4
+      [57, 62, 63, 67], // Cm6     = A3 D4 Eb4 G4
     ]);
   });
 });

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { getVoicing, QUALITIES } from '../voicings';
-import { placeVoicing, LOWEST_MIN, LOWEST_MAX } from '../placement';
+import { placeVoicing, TOP_MIN, TOP_MAX } from '../placement';
 import { buildProgression, placeProgression, PROGRESSIONS } from '../progressions';
 import { keyName, notePc, spellInterval, spellVoicing, toGlyphs, ROOT_NAMES } from '../spelling';
-import { allItems, contextsFor, itemId, itemsOf, parseItemId } from '../items';
+import { allItems, contextOf, itemId, itemsOf, parseItemId } from '../items';
 import { chordSymbol } from '../format';
 import { buildChord, CHROMATIC_ORDER, FOURTHS_ORDER } from '../chord';
 import type { Form, ProgressionType } from '../types';
@@ -18,7 +18,8 @@ describe('B형 파생', () => {
     dom7: { intervals: [16, 21, 22, 26], degrees: ['3', '13', 'b7', '9'] },
     maj7: { intervals: [11, 14, 16, 19], degrees: ['7', '9', '3', '5'] },
     m7b5: { intervals: [10, 12, 15, 18], degrees: ['b7', '1', 'b3', 'b5'] },
-    dom7b9: { intervals: [16, 19, 22, 25], degrees: ['3', '5', 'b7', 'b9'] },
+    dom7b9b13: { intervals: [16, 20, 22, 25], degrees: ['3', 'b13', 'b7', 'b9'] },
+    m6: { intervals: [9, 14, 15, 19], degrees: ['6', '9', 'b3', '5'] },
   };
 
   it.each(QUALITIES)('%s B형 = A형 위 두 성부를 옥타브 내려 아래에 배치', (q) => {
@@ -60,13 +61,13 @@ describe('검산: C minor A형', () => {
     expect(chords[0].rootName).toBe('D');
     expect(chords[0].noteNames).toEqual(['F', 'Ab', 'C', 'D']);
   });
-  it('G7b9 = F Ab B D', () => {
+  it('G7b9b13 = F Ab B Eb', () => {
     expect(chords[1].rootName).toBe('G');
-    expect(chords[1].noteNames).toEqual(['F', 'Ab', 'B', 'D']);
+    expect(chords[1].noteNames).toEqual(['F', 'Ab', 'B', 'Eb']);
   });
-  it('Cm9 = Eb G Bb D', () => {
+  it('Cm6 = Eb G A D', () => {
     expect(chords[2].rootName).toBe('C');
-    expect(chords[2].noteNames).toEqual(['Eb', 'G', 'Bb', 'D']);
+    expect(chords[2].noteNames).toEqual(['Eb', 'G', 'A', 'D']);
   });
 });
 
@@ -76,23 +77,29 @@ describe('검산: C minor B형', () => {
   it('Dm7b5 = C D F Ab', () => {
     expect(chords[0].noteNames).toEqual(['C', 'D', 'F', 'Ab']);
   });
-  it('G7b9 = B D F Ab', () => {
-    expect(chords[1].noteNames).toEqual(['B', 'D', 'F', 'Ab']);
+  it('G7b9b13 = B Eb F Ab', () => {
+    expect(chords[1].noteNames).toEqual(['B', 'Eb', 'F', 'Ab']);
   });
-  it('Cm9 = Bb D Eb G', () => {
-    expect(chords[2].noteNames).toEqual(['Bb', 'D', 'Eb', 'G']);
+  it('Cm6 = A D Eb G', () => {
+    expect(chords[2].noteNames).toEqual(['A', 'D', 'Eb', 'G']);
   });
 });
 
 describe('옥타브 배치 (canonical)', () => {
-  it('전 120개 item: 최저음이 MIDI 48–59, 4음 순증가', () => {
+  it('전 144개 item: 최고음(엄지)이 MIDI 60–72, 4음 순증가', () => {
     for (const item of allItems()) {
       const midi = placeVoicing(item.rootPc, getVoicing(item.quality, item.form));
       expect(midi).toHaveLength(4);
-      expect(midi[0]).toBeGreaterThanOrEqual(LOWEST_MIN);
-      expect(midi[0]).toBeLessThanOrEqual(LOWEST_MAX);
+      expect(midi[3]).toBeGreaterThanOrEqual(TOP_MIN);
+      expect(midi[3]).toBeLessThanOrEqual(TOP_MAX);
       for (let i = 1; i < 4; i++) expect(midi[i]).toBeGreaterThan(midi[i - 1]);
     }
+  });
+
+  it('canonical이 실제로 쓰는 MIDI 구간은 49–71 (채점 허용 범위 36–71 안)', () => {
+    const all = allItems().map((it) => placeVoicing(it.rootPc, getVoicing(it.quality, it.form)));
+    expect(Math.min(...all.map((m) => m[0]))).toBe(49);
+    expect(Math.max(...all.map((m) => m[3]))).toBe(71);
   });
 
   it('C major A형의 canonical 배치는 F3 A3 C4 E4 / F3 A3 B3 E4 / E3 G3 B3 D4', () => {
@@ -105,7 +112,8 @@ describe('옥타브 배치 (canonical)', () => {
 
 describe('보이스리딩: 전 12키 × 메이저/마이너 × A/B', () => {
   // pitch class 기준 — 간격 테이블 자체의 보이스리딩 검증
-  it('인접 코드 간 움직이는 성부(pc 기준)가 1~3개', () => {
+  // 마이너 V(7♭9♭13) → i(m6)는 네 성부가 다 움직인다. 대신 성부당 이동은 작다(아래 테스트).
+  it('인접 코드 간 움직이는 성부(pc 기준)가 1~4개', () => {
     for (let keyPc = 0; keyPc < 12; keyPc++) {
       for (const type of TYPES) {
         for (const form of FORMS) {
@@ -114,7 +122,7 @@ describe('보이스리딩: 전 12키 × 메이저/마이너 × A/B', () => {
             const prev = new Set(chords[i - 1].midi.map((n) => n % 12));
             const moved = chords[i].midi.filter((n) => !prev.has(n % 12)).length;
             expect(moved, `${keyName(keyPc)} ${type} ${form} chord ${i}`).toBeGreaterThanOrEqual(1);
-            expect(moved, `${keyName(keyPc)} ${type} ${form} chord ${i}`).toBeLessThanOrEqual(3);
+            expect(moved, `${keyName(keyPc)} ${type} ${form} chord ${i}`).toBeLessThanOrEqual(4);
           }
         }
       }
@@ -122,7 +130,7 @@ describe('보이스리딩: 전 12키 × 메이저/마이너 × A/B', () => {
   });
 
   // MIDI 기준 — 재생용 배치가 실제로 부드럽게 이어지는지 검증
-  it('placeProgression: 움직이는 성부 1~3개, 성부당 이동 ≤ 2반음, 첫 코드는 canonical', () => {
+  it('placeProgression: 움직이는 성부 1~4개, 성부당 이동 ≤ 2반음, 첫 코드는 canonical', () => {
     for (let keyPc = 0; keyPc < 12; keyPc++) {
       for (const type of TYPES) {
         for (const form of FORMS) {
@@ -136,7 +144,7 @@ describe('보이스리딩: 전 12키 × 메이저/마이너 × A/B', () => {
             const moved = diffs.filter((d) => d > 0).length;
             const label = `${keyName(keyPc)} ${type} ${form} chord ${i}`;
             expect(moved, label).toBeGreaterThanOrEqual(1);
-            expect(moved, label).toBeLessThanOrEqual(3);
+            expect(moved, label).toBeLessThanOrEqual(4);
             expect(Math.max(...diffs), label).toBeLessThanOrEqual(2);
           }
         }
@@ -202,9 +210,9 @@ describe('음이름 표기', () => {
 });
 
 describe('코드 심볼 표기', () => {
-  it('마이너 i도 메이저 ii와 같은 m7 표기 (같은 보이싱 = 같은 라벨)', () => {
+  it('quality 하나당 표기 하나 — 마이너 i는 m6이라 메이저 ii와 겹치지 않는다', () => {
     expect(labels(0, 'major')).toEqual(['Dm7', 'G7', 'Cmaj7']);
-    expect(labels(0, 'minor')).toEqual(['Dm7♭5', 'G7♭9', 'Cm7']);
+    expect(labels(0, 'minor')).toEqual(['Dm7♭5', 'G7♭9♭13', 'Cm6']);
     expect(labels(1, 'major')).toEqual(['E♭m7', 'A♭7', 'C♯maj7']); // 루트 고정 표기: pc1 = C♯
   });
 
@@ -253,10 +261,10 @@ describe('단일 코드 (진행 문맥 없음)', () => {
 });
 
 describe('items', () => {
-  it('고유 item 120개', () => {
+  it('고유 item 144개 (6 quality × 12루트 × 2폼)', () => {
     const items = allItems();
-    expect(items).toHaveLength(120);
-    expect(new Set(items.map(itemId)).size).toBe(120);
+    expect(items).toHaveLength(144);
+    expect(new Set(items.map(itemId)).size).toBe(144);
   });
 
   it('itemsOf: 한 quality × form은 12루트 정확히 한 바퀴', () => {
@@ -278,24 +286,21 @@ describe('items', () => {
     expect(parseItemId(itemId(item))).toEqual(item);
   });
 
-  it('m7만 문맥이 두 개 (메이저 ii / 마이너 i) — 의도된 동작', () => {
-    expect(contextsFor(2, 'm7')).toEqual([
-      { type: 'major', keyPc: 0, roman: 'ii' },
-      { type: 'minor', keyPc: 2, roman: 'i' },
-    ]);
-    expect(contextsFor(7, 'dom7')).toEqual([{ type: 'major', keyPc: 0, roman: 'V' }]);
-    expect(contextsFor(0, 'maj7')).toEqual([{ type: 'major', keyPc: 0, roman: 'I' }]);
-    expect(contextsFor(2, 'm7b5')).toEqual([{ type: 'minor', keyPc: 0, roman: 'ii∅' }]);
-    expect(contextsFor(7, 'dom7b9')).toEqual([{ type: 'minor', keyPc: 0, roman: 'V' }]);
+  it('quality마다 문맥이 하나 — m7의 이중 문맥은 사라졌다', () => {
+    expect(contextOf(2, 'm7')).toEqual({ type: 'major', keyPc: 0, roman: 'ii' });
+    expect(contextOf(7, 'dom7')).toEqual({ type: 'major', keyPc: 0, roman: 'V' });
+    expect(contextOf(0, 'maj7')).toEqual({ type: 'major', keyPc: 0, roman: 'I' });
+    expect(contextOf(2, 'm7b5')).toEqual({ type: 'minor', keyPc: 0, roman: 'ii∅' });
+    expect(contextOf(7, 'dom7b9b13')).toEqual({ type: 'minor', keyPc: 0, roman: 'V' });
+    expect(contextOf(0, 'm6')).toEqual({ type: 'minor', keyPc: 0, roman: 'i' });
   });
 
   it('문맥의 진행에서 해당 슬롯 quality가 item quality와 일치한다', () => {
     for (const item of allItems()) {
-      for (const ctx of contextsFor(item.rootPc, item.quality)) {
-        const slot = PROGRESSIONS[ctx.type].find((s) => s.roman === ctx.roman)!;
-        expect(slot.quality).toBe(item.quality);
-        expect((ctx.keyPc + slot.rootOffset) % 12).toBe(item.rootPc);
-      }
+      const ctx = contextOf(item.rootPc, item.quality);
+      const slot = PROGRESSIONS[ctx.type].find((s) => s.roman === ctx.roman)!;
+      expect(slot.quality).toBe(item.quality);
+      expect((ctx.keyPc + slot.rootOffset) % 12).toBe(item.rootPc);
     }
   });
 });

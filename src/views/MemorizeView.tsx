@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Form } from '../engine/types';
 import { itemsOf } from '../engine/items';
 import { selectItems, type ProgressStore } from '../state/progress';
-import { enabledItems, enabledTypes, type Settings } from '../state/settings';
+import { enabledItems, type Settings } from '../state/settings';
 import { QUALITIES } from '../engine/voicings';
 import { QUALITY_SYMBOL } from '../engine/format';
 import { ROOT_NAMES, toGlyphs } from '../engine/spelling';
@@ -43,7 +43,6 @@ export function MemorizeView({ store, onFinish, settings }: Props) {
 
   // '전체'가 뽑는 풀은 설정(진행·폼)이 정한다. '타입별'은 직접 지정이라 설정을 타지 않는다.
   const pool = useMemo(() => enabledItems(settings), [settings]);
-  const types = useMemo(() => enabledTypes(settings), [settings]);
 
   // 초반에는 신규 상한 때문에 N보다 적게 뽑힌다 — 크기별로 실제 몇 장 나올지 미리 보여준다
   const counts = useMemo(() => {
@@ -93,7 +92,6 @@ export function MemorizeView({ store, onFinish, settings }: Props) {
             ? () => selectItems(store, pool, n, Math.random, studyDay())
             : () => itemsOf(quality, form)
         }
-        allowedTypes={types}
         onExit={() => setRunning(false)}
         onFinish={onFinish}
       />
