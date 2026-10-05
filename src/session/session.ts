@@ -1,6 +1,5 @@
 import type { Item, ItemContext, ItemId } from '../engine/items';
 import { contextOf, itemId } from '../engine/items';
-import { NOTATIONS, type Notation } from '../engine/format';
 import { shuffle } from '../lib/shuffle';
 
 /**
@@ -15,8 +14,6 @@ export type SessionCard = {
   item: Item;
   /** 출제 문맥 — quality가 정한다 (자리가 하나뿐) */
   ctx: ItemContext;
-  /** 이 카드에 쓸 코드 표기 — 카드마다 둘 중 하나를 뽑는다 (둘을 같이 보여주지 않는다) */
-  notation: Notation;
 };
 
 export type Session = {
@@ -44,7 +41,6 @@ export function createSession(items: Item[], startedAt: number, rand: () => numb
   const cards: SessionCard[] = shuffle(items, rand).map((item) => ({
     item,
     ctx: contextOf(item.rootPc, item.quality),
-    notation: NOTATIONS[Math.floor(rand() * NOTATIONS.length)] ?? 'plain',
   }));
   const [current, ...queue] = cards;
   return {

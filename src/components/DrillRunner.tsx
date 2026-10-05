@@ -3,7 +3,7 @@ import { allItems, itemId, type Item } from '../engine/items';
 import { gradeAttempt } from '../engine/grading';
 import { ROOT_NAMES, toGlyphs } from '../engine/spelling';
 import { buildProgression, PROGRESSIONS } from '../engine/progressions';
-import { chordSymbol, keyLabel } from '../engine/format';
+import { chordSymbol, FULL_ADDS_INFO, keyLabel } from '../engine/format';
 import { playChord, playNote } from '../audio/audio';
 import { Keyboard, type KeyHighlight } from './Keyboard';
 import { answerCurrent, createSession, remaining, summarize, type Session } from '../session/session';
@@ -238,7 +238,7 @@ export function DrillRunner({ draw, onExit, onFinish }: Props) {
       <div className="text-center">
         <div className="flex items-baseline justify-center gap-3">
           <span className="font-display text-6xl text-ivory">
-            {chordSymbol(chord!.rootName, card.item.quality, card.notation)}
+            {chordSymbol(chord!.rootName, card.item.quality, revealed ? 'full' : 'quiz')}
           </span>
           <span className="rounded-md border border-line px-2 py-0.5 text-sm text-ivory-dim">
             {card.item.form}형
@@ -246,6 +246,11 @@ export function DrillRunner({ draw, onExit, onFinish }: Props) {
         </div>
         <div className="mt-2 min-h-4 text-xs tracking-widest text-muted">
           {revealed ? `${keyLabel(card.ctx.keyPc, card.ctx.type)} · ${card.ctx.roman}` : ''}
+        </div>
+        <div className="min-h-4 text-[11px] text-brass">
+          {revealed && FULL_ADDS_INFO.includes(card.item.quality)
+            ? `${chordSymbol(chord!.rootName, card.item.quality, 'quiz')}로 나와도 ♭13을 넣는다`
+            : ''}
         </div>
       </div>
 

@@ -15,26 +15,12 @@ const rand0 = () => 0;
 
 function card(rootPc: number, quality: Item['quality'] = 'maj7', form: Item['form'] = 'A'): SessionCard {
   const item = { rootPc, quality, form };
-  return { item, ctx: contextOf(rootPc, quality), notation: 'plain' };
+  return { item, ctx: contextOf(rootPc, quality) };
 }
 
 function ids(cards: SessionCard[]): string[] {
   return cards.map((c) => itemId(c.item));
 }
-
-describe('코드 표기', () => {
-  it('카드마다 표기를 하나 뽑는다 — 한 세션에 둘 다 나올 수 있다', () => {
-    const s = createSession(allItems().slice(0, 60), 0, Math.random);
-    const seen = new Set([s.current!.notation, ...s.queue.map((c) => c.notation)]);
-    expect(seen.size).toBe(2);
-    expect([...seen].sort()).toEqual(['alt', 'plain']);
-  });
-
-  it('난수가 0이면 늘 plain (뽑기만 할 뿐 섞어 보여주지 않는다)', () => {
-    const s = createSession(allItems().slice(0, 5), 0, () => 0);
-    expect([s.current!, ...s.queue].every((c) => c.notation === 'plain')).toBe(true);
-  });
-});
 
 describe('보관함 루프', () => {
   it('생성: total = N, 남은 카드 = N, current 존재', () => {

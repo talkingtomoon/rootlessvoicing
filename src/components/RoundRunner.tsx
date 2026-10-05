@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { itemId, type Item, type ItemId } from '../engine/items';
 import { buildChord } from '../engine/chord';
-import { chordSymbol, keyLabel } from '../engine/format';
+import { chordSymbol, FULL_ADDS_INFO, keyLabel } from '../engine/format';
 import { gradeSequence, stackAscending } from '../engine/grading';
 import { ROOT_NAMES, toGlyphs } from '../engine/spelling';
 import { playChord, playNote } from '../audio/audio';
@@ -223,13 +223,20 @@ export function RoundRunner({ items, mode, freshIds, onFinish, onRemaining }: Pr
       <div className="flex min-h-36 flex-col items-center justify-center text-center">
         <div className="h-4 text-[11px] tracking-widest text-brass">{isFresh && !revealed ? '새 코드' : ''}</div>
         <div className="flex items-baseline gap-3">
+          {/* 풀 때는 악보에서 만나는 간략 표기, 정답을 열면 명시 표기로 바뀐다 */}
           <span className="font-display text-7xl text-ivory">
-            {chordSymbol(ROOT_NAMES[card.item.rootPc], card.item.quality, card.notation)}
+            {chordSymbol(ROOT_NAMES[card.item.rootPc], card.item.quality, revealed ? 'full' : 'quiz')}
           </span>
           <span className="rounded-md border border-line px-2 py-0.5 text-base text-ivory-dim">{card.item.form}형</span>
         </div>
         <div className="mt-2 h-4 text-xs tracking-widest text-muted">
           {revealed ? `${keyLabel(card.ctx.keyPc, card.ctx.type)} · ${card.ctx.roman}` : ''}
+        </div>
+        {/* 7♭9♭13: 문제 표기에 없는 음이 보이싱에 들어간다 — 정답에서 짚어준다 */}
+        <div className="h-4 text-[11px] text-brass">
+          {revealed && FULL_ADDS_INFO.includes(card.item.quality)
+            ? `${chordSymbol(ROOT_NAMES[card.item.rootPc], card.item.quality, 'quiz')}로 나와도 ♭13을 넣는다`
+            : ''}
         </div>
       </div>
 

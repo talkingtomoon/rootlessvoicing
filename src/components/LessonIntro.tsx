@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { itemId, type Item } from '../engine/items';
 import { buildProgression, placeProgression, PROGRESSIONS } from '../engine/progressions';
 import { chordSymbol, keyLabel, QUALITY_SYMBOL } from '../engine/format';
+import { QUALITY_SYMBOL_QUIZ } from '../engine/format';
 import { ROOT_NAMES, toGlyphs } from '../engine/spelling';
 import { progressionLinks, siblingLink } from '../engine/links';
 import { playChord, playChordSequence } from '../audio/audio';
@@ -124,6 +125,12 @@ export function LessonIntro({ unit, fresh, onDone }: Props) {
         <div className="mt-1 text-xs tracking-widest text-muted">
           {keyLabel(unit.keys[step], unit.type)} · {chord.roman}
         </div>
+        {/* 문제에서는 간략 표기로 만난다 — 소개 때 한 번 이어 둔다 */}
+        {QUALITY_SYMBOL_QUIZ[chord.quality] !== QUALITY_SYMBOL[chord.quality] && (
+          <div className="mt-1 text-xs text-brass">
+            문제에선 {chordSymbol(chord.rootName, chord.quality, 'quiz')}
+          </div>
+        )}
         <div className="mt-2 text-base tracking-wide text-ivory-dim">
           {chord.noteNames.map(toGlyphs).join('  ')}
         </div>

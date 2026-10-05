@@ -4,7 +4,7 @@ import { CANONICAL_MAX, CANONICAL_MIN, HAND_MAX, HAND_MIN, placeVoicing, TOP_MIN
 import { buildProgression, placeProgression, PROGRESSIONS } from '../progressions';
 import { keyName, notePc, spellInterval, spellVoicing, toGlyphs, ROOT_NAMES } from '../spelling';
 import { allItems, contextOf, itemId, itemsOf, parseItemId } from '../items';
-import { chordSymbol, NOTATIONS, QUALITY_SYMBOL, QUALITY_SYMBOL_ALT } from '../format';
+import { chordSymbol, FULL_ADDS_INFO, QUALITY_SYMBOL, QUALITY_SYMBOL_QUIZ } from '../format';
 import { buildChord, CHROMATIC_ORDER, FOURTHS_ORDER } from '../chord';
 import type { Form, ProgressionType } from '../types';
 
@@ -221,29 +221,45 @@ describe('음이름 표기', () => {
   });
 });
 
-describe('코드 심볼 표기 2종', () => {
-  it('표기 A / 표기 B (스펙 §3)', () => {
+describe('코드 심볼 표기 — 용도별 고정', () => {
+  it('문제는 간략, 정답은 명시 (스펙 §3 개정)', () => {
     const rows: [typeof QUALITIES[number], string, string][] = [
-      ['maj7', 'Cmaj7', 'CΔ7'],
-      ['m7', 'Cm7', 'C-7'],
+      // quality, 문제(간략), 정답(명시)
+      ['maj7', 'CΔ7', 'Cmaj7'],
+      ['m7', 'C-7', 'Cm7'],
       ['dom7', 'C7', 'C7'],
-      ['m7b5', 'Cm7♭5', 'Cø7'],
-      ['m6', 'Cm6', 'C-6'],
-      ['dom7b9b13', 'C7♭9♭13', 'C7(♭9♭13)'],
+      ['m7b5', 'Cø7', 'Cm7♭5'],
+      ['m6', 'C-6', 'Cm6'],
+      ['dom7b9b13', 'C7♭9', 'C7♭9♭13'],
     ];
-    for (const [q, plain, alt] of rows) {
-      expect(chordSymbol('C', q), q).toBe(plain);
-      expect(chordSymbol('C', q, 'alt'), q).toBe(alt);
+    for (const [q, quiz, full] of rows) {
+      expect(chordSymbol('C', q, 'quiz'), q).toBe(quiz);
+      expect(chordSymbol('C', q, 'full'), q).toBe(full);
+      expect(chordSymbol('C', q), q).toBe(full); // 기본은 명시
     }
-    expect(chordSymbol('Db', 'm7b5', 'alt')).toBe('D♭ø7');
-    expect(NOTATIONS).toEqual(['plain', 'alt']);
+    expect(chordSymbol('Db', 'm7b5', 'quiz')).toBe('D♭ø7');
   });
 
   it('두 표기 테이블이 6 quality를 다 덮는다', () => {
     for (const q of QUALITIES) {
       expect(QUALITY_SYMBOL[q], q).toBeTruthy();
-      expect(QUALITY_SYMBOL_ALT[q], q).toBeTruthy();
+      expect(QUALITY_SYMBOL_QUIZ[q], q).toBeTruthy();
     }
+  });
+
+  it('명시 표기가 내용을 더 담는 건 7♭9♭13 하나뿐 — 나머지는 같은 코드의 다른 글자', () => {
+    expect(FULL_ADDS_INFO).toEqual(['dom7b9b13']);
+    // 간략 표기에 적힌 텐션은 명시 표기에도 다 있다
+    for (const q of QUALITIES) {
+      const quiz = QUALITY_SYMBOL_QUIZ[q];
+      const full = QUALITY_SYMBOL[q];
+      for (const tension of quiz.match(/b?\d+/g) ?? []) {
+        expect(full, `${q}: ${quiz}`).toContain(tension);
+      }
+    }
+    // 7♭9♭13만 명시 쪽에 간략에 없는 음(♭13)이 더 있다
+    expect(QUALITY_SYMBOL.dom7b9b13).toContain('b13');
+    expect(QUALITY_SYMBOL_QUIZ.dom7b9b13).not.toContain('b13');
   });
 });
 
