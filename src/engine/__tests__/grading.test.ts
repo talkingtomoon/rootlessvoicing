@@ -14,8 +14,10 @@ describe('옥타브 관대 채점', () => {
     expect(gradeAttempt([41, 45, 48, 52], dm7)).toBe(true);
   });
 
-  it('+1 옥타브는 엄지가 C5를 넘으므로 오답', () => {
+  it('+1 옥타브는 오답 — 엄지가 C5 위로 올라가는 자리는 쓰지 않는다', () => {
     expect(gradeAttempt([65, 69, 72, 76], dm7)).toBe(false);
+    // 범위 안에 들어가더라도 위로는 열지 않는다
+    expect(gradeAttempt([61, 65, 68, 72], [49, 53, 56, 60])).toBe(false);
   });
 
   it('-1 옥타브까지만 (Dm7b5 B형: C4 D4 F4 Ab4)', () => {
@@ -24,8 +26,8 @@ describe('옥타브 관대 채점', () => {
     expect(gradeAttempt([36, 38, 41, 44], dm7b5B)).toBe(false); // -2 옥타브는 오답
   });
 
-  it('채점 허용 범위는 건반 클릭 범위와 같아야 한다', () => {
-    expect([GRADE_MIN, GRADE_MAX]).toEqual([36, 71]);
+  it('채점 허용 범위 = 손 범위 = 건반 클릭 범위', () => {
+    expect([GRADE_MIN, GRADE_MAX]).toEqual([36, 72]);
   });
 
   it('한 음이라도 틀리면 오답', () => {

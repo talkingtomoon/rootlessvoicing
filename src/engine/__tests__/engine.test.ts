@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getVoicing, QUALITIES } from '../voicings';
-import { placeVoicing, TOP_MIN, TOP_MAX } from '../placement';
+import { CANONICAL_MAX, CANONICAL_MIN, HAND_MAX, HAND_MIN, placeVoicing, TOP_MIN, TOP_MAX } from '../placement';
 import { buildProgression, placeProgression, PROGRESSIONS } from '../progressions';
 import { keyName, notePc, spellInterval, spellVoicing, toGlyphs, ROOT_NAMES } from '../spelling';
 import { allItems, contextOf, itemId, itemsOf, parseItemId } from '../items';
@@ -96,10 +96,14 @@ describe('옥타브 배치 (canonical)', () => {
     }
   });
 
-  it('canonical이 실제로 쓰는 MIDI 구간은 49–71 (채점 허용 범위 36–71 안)', () => {
+  it('canonical이 실제로 쓰는 구간은 49–71이고, 손 범위(36–72) 안이다', () => {
     const all = allItems().map((it) => placeVoicing(it.rootPc, getVoicing(it.quality, it.form)));
-    expect(Math.min(...all.map((m) => m[0]))).toBe(49);
-    expect(Math.max(...all.map((m) => m[3]))).toBe(71);
+    expect(Math.min(...all.map((m) => m[0]))).toBe(CANONICAL_MIN);
+    expect(Math.max(...all.map((m) => m[3]))).toBe(CANONICAL_MAX);
+    expect(CANONICAL_MIN).toBeGreaterThanOrEqual(HAND_MIN);
+    expect(CANONICAL_MAX).toBeLessThanOrEqual(HAND_MAX);
+    // 한 옥타브 아래로 쳐도 건반 안 (관대 채점이 실제로 쓸 수 있다)
+    expect(CANONICAL_MIN - 12).toBeGreaterThanOrEqual(HAND_MIN);
   });
 
   it('C major A형의 canonical 배치는 F3 A3 C4 E4 / F3 A3 B3 E4 / E3 G3 B3 D4', () => {
@@ -111,18 +115,25 @@ describe('옥타브 배치 (canonical)', () => {
 });
 
 describe('보이스리딩: 전 12키 × 메이저/마이너 × A/B', () => {
-  // pitch class 기준 — 간격 테이블 자체의 보이스리딩 검증
-  // 마이너 V(7♭9♭13) → i(m6)는 네 성부가 다 움직인다. 대신 성부당 이동은 작다(아래 테스트).
-  it('인접 코드 간 움직이는 성부(pc 기준)가 1~4개', () => {
+  /**
+   * 기준은 **이동 성부의 개수가 아니라 성부당 거리**다.
+   * 마이너 V(7♭9♭13) → i(m6)는 네 성부가 다 내려간다 — 그게 마이너 해결의 소리다.
+   * 긴장이 풀리는 느낌은 "안 움직이는 음이 있다"가 아니라 "다 같이 한두 반음씩 내려간다"에서 온다.
+   */
+  it('인접 코드 간 성부당 이동이 2반음 이하 (pc 기준)', () => {
+    const pcDistance = (a: number, b: number) => {
+      const d = (((b - a) % 12) + 12) % 12;
+      return Math.min(d, 12 - d);
+    };
     for (let keyPc = 0; keyPc < 12; keyPc++) {
       for (const type of TYPES) {
         for (const form of FORMS) {
           const chords = buildProgression(keyPc, type, form);
           for (let i = 1; i < chords.length; i++) {
-            const prev = new Set(chords[i - 1].midi.map((n) => n % 12));
-            const moved = chords[i].midi.filter((n) => !prev.has(n % 12)).length;
-            expect(moved, `${keyName(keyPc)} ${type} ${form} chord ${i}`).toBeGreaterThanOrEqual(1);
-            expect(moved, `${keyName(keyPc)} ${type} ${form} chord ${i}`).toBeLessThanOrEqual(4);
+            const label = `${keyName(keyPc)} ${type} ${form} chord ${i}`;
+            const dists = chords[i].midi.map((n, j) => pcDistance(chords[i - 1].midi[j], n));
+            expect(Math.max(...dists), label).toBeLessThanOrEqual(2);
+            expect(Math.max(...dists), label).toBeGreaterThan(0); // 같은 코드가 이어지지는 않는다
           }
         }
       }
@@ -130,7 +141,7 @@ describe('보이스리딩: 전 12키 × 메이저/마이너 × A/B', () => {
   });
 
   // MIDI 기준 — 재생용 배치가 실제로 부드럽게 이어지는지 검증
-  it('placeProgression: 움직이는 성부 1~4개, 성부당 이동 ≤ 2반음, 첫 코드는 canonical', () => {
+  it('placeProgression: 성부당 이동 ≤ 2반음, 손 범위 안, 첫 코드는 canonical', () => {
     for (let keyPc = 0; keyPc < 12; keyPc++) {
       for (const type of TYPES) {
         for (const form of FORMS) {
@@ -141,11 +152,11 @@ describe('보이스리딩: 전 12키 × 메이저/마이너 × A/B', () => {
           );
           for (let i = 1; i < placed.length; i++) {
             const diffs = placed[i].map((n, j) => Math.abs(n - placed[i - 1][j]));
-            const moved = diffs.filter((d) => d > 0).length;
             const label = `${keyName(keyPc)} ${type} ${form} chord ${i}`;
-            expect(moved, label).toBeGreaterThanOrEqual(1);
-            expect(moved, label).toBeLessThanOrEqual(4);
             expect(Math.max(...diffs), label).toBeLessThanOrEqual(2);
+            expect(Math.max(...diffs), label).toBeGreaterThan(0);
+            expect(Math.min(...placed[i]), label).toBeGreaterThanOrEqual(HAND_MIN);
+            expect(Math.max(...placed[i]), label).toBeLessThanOrEqual(HAND_MAX);
           }
         }
       }

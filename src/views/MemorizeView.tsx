@@ -113,7 +113,7 @@ export function MemorizeView({ store, onFinish, settings }: Props) {
       {mode === 'all' ? (
         <>
           <div className="text-center">
-            <div className="text-xs tracking-widest text-muted">120개에서 랜덤</div>
+            <div className="text-xs tracking-widest text-muted">{pool.length}개에서 랜덤</div>
             <h2 className="mt-1 font-display text-3xl text-ivory">몇 장 돌릴까</h2>
           </div>
           <div className="flex gap-3">

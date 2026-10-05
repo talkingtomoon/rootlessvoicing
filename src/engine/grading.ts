@@ -1,3 +1,5 @@
+import { HAND_MAX, HAND_MIN } from './placement';
+
 /**
  * 옥타브 관대 채점: 시도한 4음이 정답 보이싱의 온옥타브 이동형이고
  * 전체가 MIDI 36–71 (C2–B4) 안에 들어오면 정답.
@@ -7,8 +9,7 @@
  * 거기서 한 옥타브 아래까지 허용한다. 위로는 열지 않는다 — 엄지가 C5를 넘으면 왼손 자리가 아니다.
  * **화면 건반의 클릭 가능 범위(Keyboard의 from/to 기본값)와 항상 같아야 한다.**
  */
-export const GRADE_MIN = 36; // C2
-export const GRADE_MAX = 71; // B4
+export { HAND_MIN as GRADE_MIN, HAND_MAX as GRADE_MAX } from './placement';
 
 /** 허용하는 옥타브 이동: canonical 그대로이거나 한 옥타브 아래. 두 옥타브 아래는 왼손 자리가 아니다. */
 const ALLOWED_SHIFTS = [0, -12];
@@ -20,7 +21,7 @@ export function gradeAttempt(attempt: number[], canonicalMidi: number[]): boolea
   const shift = sorted[0] - canonicalMidi[0];
   if (!ALLOWED_SHIFTS.includes(shift)) return false;
   if (!sorted.every((n, i) => n === canonicalMidi[i] + shift)) return false;
-  return sorted[0] >= GRADE_MIN && sorted[sorted.length - 1] <= GRADE_MAX;
+  return sorted[0] >= HAND_MIN && sorted[sorted.length - 1] <= HAND_MAX;
 }
 
 /**

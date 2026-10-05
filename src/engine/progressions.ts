@@ -1,6 +1,6 @@
 import type { ChordQuality, Form, ProgressionType } from './types';
 import { getVoicing } from './voicings';
-import { placeVoicing } from './placement';
+import { HAND_MAX, HAND_MIN, placeVoicing } from './placement';
 import { buildChord, type Chord } from './chord';
 
 export type ProgressionSlot = {
@@ -37,6 +37,8 @@ export function buildProgression(keyPc: number, type: ProgressionType, form: For
  * 순차 재생용 배치. 첫 코드는 canonical, 이후 코드는 ±1 옥타브 후보 중
  * 직전 코드와의 총 이동량이 최소인 배치를 고른다.
  * (경계 키에서 canonical끼리는 옥타브 점프가 생길 수 있어서 재생용만 보정)
+ *
+ * 보정 결과도 **손 범위(HAND_MIN..HAND_MAX) 안에** 머문다 — 화면 건반에 그릴 수 없는 음이 나오면 안 된다.
  */
 export function placeProgression(keyPc: number, type: ProgressionType, form: Form): number[][] {
   const canonical = PROGRESSIONS[type].map((slot) =>
@@ -49,6 +51,7 @@ export function placeProgression(keyPc: number, type: ProgressionType, form: For
     let bestCost = Infinity;
     for (const shift of [-12, 0, 12]) {
       const cand = canonical[i].map((n) => n + shift);
+      if (cand[0] < HAND_MIN || cand[cand.length - 1] > HAND_MAX) continue;
       const cost = cand.reduce((sum, n, j) => sum + Math.abs(n - prev[j]), 0);
       if (cost < bestCost) {
         bestCost = cost;

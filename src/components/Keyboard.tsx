@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toGlyphs } from '../engine/spelling';
 import { NARROW, useMediaQuery } from '../lib/useMediaQuery';
+import { CANONICAL_MAX, CANONICAL_MIN, HAND_MAX, HAND_MIN } from '../engine/placement';
 
 export type KeyHighlight = {
   midi: number;
@@ -17,6 +18,8 @@ type Props = {
   onKeyPress?: (midi: number) => void;
   /** false면 좁은 화면에서도 페이징하지 않고 범위 전체를 한 번에 그린다 (짧은 범위 전용) */
   paged?: boolean;
+  /** canonical 구간 표시 — 넓은 건반에서 손이 앉을 자리를 알려준다. 짧은 범위에서는 끈다 */
+  guide?: boolean;
 };
 
 const WHITE_PCS = [0, 2, 4, 5, 7, 9, 11];
@@ -49,8 +52,15 @@ function buildKeys(from: number, to: number): { keys: KeyGeom[]; width: number }
 /** 좁은 화면에서 한 번에 보여줄 반음 수 (한 옥타브 + 위 C) */
 const PAGE_SPAN = 12;
 
-/** 기본 범위 C2–B4 = 채점 허용 범위(GRADE_MIN..GRADE_MAX)와 정확히 일치시킨다 */
-export function Keyboard({ from = 36, to = 71, highlights = [], onKeyPress, paged = true }: Props) {
+/** 기본 범위 C2–B4 = 손 범위(HAND_MIN..HAND_MAX) = 채점 허용 범위. 셋은 항상 같다. */
+export function Keyboard({
+  from = HAND_MIN,
+  to = HAND_MAX,
+  highlights = [],
+  onKeyPress,
+  paged = true,
+  guide = true,
+}: Props) {
   const [pressed, setPressed] = useState<number | null>(null);
   const releaseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const narrow = useMediaQuery(NARROW) && paged;
@@ -100,6 +110,13 @@ export function Keyboard({ from = 36, to = 71, highlights = [], onKeyPress, page
 
   const whites = keys.filter((k) => !k.black);
   const blacks = keys.filter((k) => k.black);
+
+  // canonical 구간을 백건 아래쪽에 연필선처럼 옅게 — 크림슨 펠트와 싸우지 않게 조용히
+  const guideKeys = guide ? whites.filter((k) => k.midi >= CANONICAL_MIN && k.midi <= CANONICAL_MAX) : [];
+  const guideBand =
+    guideKeys.length > 1 && (visFrom < CANONICAL_MIN || visTo > CANONICAL_MAX)
+      ? { x: guideKeys[0].x + 0.75, width: guideKeys[guideKeys.length - 1].x + WW - 0.75 - guideKeys[0].x }
+      : null;
 
   const octaveLabel = `${['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'][visFrom % 12]}${Math.floor(visFrom / 12) - 1}`;
 
@@ -151,6 +168,18 @@ export function Keyboard({ from = 36, to = 71, highlights = [], onKeyPress, page
           </g>
         );
       })}
+
+      {guideBand && (
+        <rect
+          x={guideBand.x}
+          y={FELT + WH - 7}
+          width={guideBand.width}
+          height={2.5}
+          rx={1.25}
+          fill="var(--color-muted)"
+          opacity={0.35}
+        />
+      )}
 
       {blacks.map((k) => {
         const hl = hlMap.get(k.midi);

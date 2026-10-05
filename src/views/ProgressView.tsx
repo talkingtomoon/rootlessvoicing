@@ -8,6 +8,9 @@ function learnedCount(store: ProgressStore): number {
   return allItems().filter((it) => levelOf(store, it) !== null).length;
 }
 
+/** 전체 item 수 — 하드코딩하지 마라 (quality가 늘면 따라 움직여야 한다) */
+const TOTAL = allItems().length;
+
 type Props = {
   store: ProgressStore;
   /** 주소로 실려온 진도 — 사용자가 확인해야 적용된다 */
@@ -69,10 +72,10 @@ export function ProgressView({
           <div className="text-sm text-ivory">다른 기기의 진도를 가져올까?</div>
           <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted">
             <span>
-              지금 이 기기 — 세션 {store.session}회 · 학습 {learnedCount(store)}/120
+              지금 이 기기 — 세션 {store.session}회 · 학습 {learnedCount(store)}/{TOTAL}
             </span>
             <span className="text-ivory-dim">
-              가져올 것 — 세션 {incoming.session}회 · 학습 {learnedCount(incoming)}/120
+              가져올 것 — 세션 {incoming.session}회 · 학습 {learnedCount(incoming)}/{TOTAL}
             </span>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -81,7 +84,7 @@ export function ProgressView({
               onClick={onMergeIncoming}
               className="rounded-full border border-brass px-4 py-1.5 text-sm text-ivory hover:bg-surface"
             >
-              합치기 (학습 {merge.total}/120
+              합치기 (학습 {merge.total}/{TOTAL}
               {merge.added > 0 ? ` · +${merge.added}개` : ''}
               {merge.raised > 0 ? ` · ${merge.raised}개 단계↑` : ''})
             </button>
@@ -106,7 +109,7 @@ export function ProgressView({
 
       <div className="text-center">
         <div className="text-xs tracking-widest text-muted">
-          세션 {store.session}회 · 학습 {learnedCount(store)}/120
+          세션 {store.session}회 · 학습 {learnedCount(store)}/{TOTAL}
         </div>
       </div>
 
