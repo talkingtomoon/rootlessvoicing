@@ -224,7 +224,7 @@ export function RoundRunner({ items, mode, freshIds, onFinish, onRemaining }: Pr
         <div className="h-4 text-[11px] tracking-widest text-brass">{isFresh && !revealed ? '새 코드' : ''}</div>
         <div className="flex items-baseline gap-3">
           <span className="font-display text-7xl text-ivory">
-            {chordSymbol(ROOT_NAMES[card.item.rootPc], card.item.quality)}
+            {chordSymbol(ROOT_NAMES[card.item.rootPc], card.item.quality, card.notation)}
           </span>
           <span className="rounded-md border border-line px-2 py-0.5 text-base text-ivory-dim">{card.item.form}형</span>
         </div>

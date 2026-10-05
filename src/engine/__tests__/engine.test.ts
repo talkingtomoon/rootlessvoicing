@@ -4,7 +4,7 @@ import { CANONICAL_MAX, CANONICAL_MIN, HAND_MAX, HAND_MIN, placeVoicing, TOP_MIN
 import { buildProgression, placeProgression, PROGRESSIONS } from '../progressions';
 import { keyName, notePc, spellInterval, spellVoicing, toGlyphs, ROOT_NAMES } from '../spelling';
 import { allItems, contextOf, itemId, itemsOf, parseItemId } from '../items';
-import { chordSymbol } from '../format';
+import { chordSymbol, NOTATIONS, QUALITY_SYMBOL, QUALITY_SYMBOL_ALT } from '../format';
 import { buildChord, CHROMATIC_ORDER, FOURTHS_ORDER } from '../chord';
 import type { Form, ProgressionType } from '../types';
 
@@ -166,7 +166,8 @@ describe('보이스리딩: 전 12키 × 메이저/마이너 × A/B', () => {
 
 describe('음이름 표기', () => {
   it('루트는 문맥 무관 고정 표기 — 같은 item은 어떤 키로 출제돼도 같은 심볼', () => {
-    expect(ROOT_NAMES).toHaveLength(12);
+    // 스펙 §3의 고정 배열 — 진행 토닉 기준 철자 로직을 쓰지 않는다
+    expect(ROOT_NAMES).toEqual(['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B']);
     // pc 1은 항상 C#, pc 3은 항상 Eb (진행 토닉과 무관)
     expect(buildProgression(1, 'major', 'A')[2].rootName).toBe('C#'); // C# major의 I
     expect(buildProgression(11, 'major', 'A')[0].rootName).toBe('C#'); // B major의 ii
@@ -217,6 +218,32 @@ describe('음이름 표기', () => {
     expect(toGlyphs('F#')).toBe('F♯');
     expect(toGlyphs('b3')).toBe('♭3');
     expect(toGlyphs('m7b5')).toBe('m7♭5');
+  });
+});
+
+describe('코드 심볼 표기 2종', () => {
+  it('표기 A / 표기 B (스펙 §3)', () => {
+    const rows: [typeof QUALITIES[number], string, string][] = [
+      ['maj7', 'Cmaj7', 'CΔ7'],
+      ['m7', 'Cm7', 'C-7'],
+      ['dom7', 'C7', 'C7'],
+      ['m7b5', 'Cm7♭5', 'Cø7'],
+      ['m6', 'Cm6', 'C-6'],
+      ['dom7b9b13', 'C7♭9♭13', 'C7(♭9♭13)'],
+    ];
+    for (const [q, plain, alt] of rows) {
+      expect(chordSymbol('C', q), q).toBe(plain);
+      expect(chordSymbol('C', q, 'alt'), q).toBe(alt);
+    }
+    expect(chordSymbol('Db', 'm7b5', 'alt')).toBe('D♭ø7');
+    expect(NOTATIONS).toEqual(['plain', 'alt']);
+  });
+
+  it('두 표기 테이블이 6 quality를 다 덮는다', () => {
+    for (const q of QUALITIES) {
+      expect(QUALITY_SYMBOL[q], q).toBeTruthy();
+      expect(QUALITY_SYMBOL_ALT[q], q).toBeTruthy();
+    }
   });
 });
 

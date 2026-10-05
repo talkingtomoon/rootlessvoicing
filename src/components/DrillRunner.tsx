@@ -238,7 +238,7 @@ export function DrillRunner({ draw, onExit, onFinish }: Props) {
       <div className="text-center">
         <div className="flex items-baseline justify-center gap-3">
           <span className="font-display text-6xl text-ivory">
-            {chordSymbol(chord!.rootName, card.item.quality)}
+            {chordSymbol(chord!.rootName, card.item.quality, card.notation)}
           </span>
           <span className="rounded-md border border-line px-2 py-0.5 text-sm text-ivory-dim">
             {card.item.form}형
