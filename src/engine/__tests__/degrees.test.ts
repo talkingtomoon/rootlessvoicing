@@ -1,45 +1,90 @@
 import { describe, expect, it } from 'vitest';
-import { degreeMidis, degreeNoteNames, degreePitchClasses, degreeSteps } from '../degrees';
+import {
+  degreeMidis,
+  degreeNoteNames,
+  degreePitchClasses,
+  degreeSemitone,
+  degreeSteps,
+} from '../degrees';
 import { QUALITIES, getVoicing } from '../voicings';
-import { buildChord } from '../chord';
 import { toGlyphs } from '../spelling';
 
-const labels = (q: Parameters<typeof degreeSteps>[0]) => degreeSteps(q).map((s) => toGlyphs(s.degree)).join(' ');
+const labels = (q: Parameters<typeof degreeSteps>[0]) =>
+  degreeSteps(q)
+    .map((s) => toGlyphs(s.degree))
+    .join(' ');
 
-describe('도수 드릴 — 찍을 음 (스펙 §4)', () => {
+describe('도수 드릴 — 찍을 음 (확정 스펙 §2)', () => {
   it('quality별 도수와 순서', () => {
-    expect(labels('maj7')).toBe('1 3 5 7 9');
-    expect(labels('dom7')).toBe('1 3 ♭7 9 13');
     expect(labels('m7')).toBe('1 ♭3 5 ♭7 9');
+    expect(labels('dom7')).toBe('1 3 5 ♭7 9 13');
+    expect(labels('maj7')).toBe('1 3 5 7 9');
     expect(labels('m7b5')).toBe('1 ♭3 ♭5 ♭7');
-    expect(labels('dom7b9b13')).toBe('1 3 ♭7 ♭9 ♭13');
+    expect(labels('dom7b9b13')).toBe('1 3 5 ♭7 ♭9 ♭13');
     expect(labels('m6')).toBe('1 ♭3 5 6 9');
   });
 
-  it('칸 수는 quality마다 다르다 — 균일하게 만들지 마라', () => {
-    expect(degreeSteps('m7b5')).toHaveLength(4); // 보이싱이 루트를 품는다
-    for (const q of QUALITIES.filter((q) => q !== 'm7b5')) {
-      expect(degreeSteps(q), q).toHaveLength(5);
-    }
-    // 두 도미넌트에는 5음이 없다
-    expect(labels('dom7')).not.toContain('5');
-    expect(degreeSteps('dom7b9b13').some((s) => s.degree === '5')).toBe(false);
+  it('개수는 quality마다 다르다 — 보이싱이 불균등한 것이지 빠뜨린 게 아니다', () => {
+    const counts = Object.fromEntries(QUALITIES.map((q) => [q, degreeSteps(q).length]));
+    expect(counts).toEqual({ m7: 5, dom7: 6, maj7: 5, m7b5: 4, dom7b9b13: 6, m6: 5 });
   });
 
-  it('루트를 빼면 그 코드의 보이싱 구성음 그대로다', () => {
+  it('두 도미넌트의 5는 드릴에 있지만 보이싱에는 없다 — 손으로 안 치는 음 표시', () => {
+    for (const q of ['dom7', 'dom7b9b13'] as const) {
+      const five = degreeSteps(q).find((s) => s.degree === '5')!;
+      expect(five.chordTone, q).toBe(true);
+      expect(five.inVoicing, q).toBe(false);
+    }
+    // 루트를 빼면 안 치는 음은 그 둘뿐이다
+    const unplayed = QUALITIES.flatMap((q) =>
+      degreeSteps(q)
+        .filter((s) => !s.inVoicing && s.degree !== '1')
+        .map((s) => `${q}:${s.degree}`),
+    );
+    expect(unplayed).toEqual(['dom7:5', 'dom7b9b13:5']);
+  });
+
+  it('m7♭5는 4음 — 맨 위에 루트를 또 넣지 않는다', () => {
+    const steps = degreeSteps('m7b5');
+    expect(steps.map((s) => s.degree)).toEqual(['1', 'b3', 'b5', 'b7']);
+    expect(steps.filter((s) => s.degree === '1')).toHaveLength(1);
+  });
+
+  it('코드톤과 텐션이 갈린다 (m6의 6은 코드톤)', () => {
+    const tension = (q: Parameters<typeof degreeSteps>[0]) =>
+      degreeSteps(q)
+        .filter((s) => !s.chordTone)
+        .map((s) => s.degree);
+    expect(tension('m7')).toEqual(['9']);
+    expect(tension('dom7')).toEqual(['9', '13']);
+    expect(tension('maj7')).toEqual(['9']);
+    expect(tension('m7b5')).toEqual([]);
+    expect(tension('dom7b9b13')).toEqual(['b9', 'b13']);
+    expect(tension('m6')).toEqual(['9']);
+    expect(degreeSteps('m6').find((s) => s.degree === '6')!.chordTone).toBe(true);
+  });
+
+  it('13·♭13 라벨을 6·♭6으로 바꾸지 않는다 (같은 건반, 다른 이름)', () => {
+    expect(degreeSteps('dom7').map((s) => s.degree)).toContain('13');
+    expect(degreeSteps('dom7b9b13').map((s) => s.degree)).toContain('b13');
+    expect(degreeSemitone('13')).toBe(9);
+    expect(degreeSemitone('6')).toBe(9);
+    expect(degreeSemitone('b13')).toBe(8);
+    expect(degreeSemitone('b9')).toBe(1);
+  });
+
+  it('코드톤 + 보이싱이 쓰는 텐션 = 드릴 (보이싱 음은 하나도 빠지지 않는다)', () => {
     for (const q of QUALITIES) {
-      const drill = new Set(degreeSteps(q).map((s) => s.semitone));
-      const voicing = new Set(getVoicing(q, 'A').intervals.map((iv) => iv % 12));
-      drill.delete(0); // 루트
-      voicing.delete(0); // m7♭5의 루트
-      expect([...drill].sort(), q).toEqual([...voicing].sort());
+      const drill = new Set(degreeSteps(q).map((s) => s.degree));
+      for (const d of getVoicing(q, 'A').degrees) expect(drill, `${q}: ${d}`).toContain(d);
     }
   });
 
-  it('한 옥타브 안 — 9는 2도 자리, 13은 6도 자리', () => {
+  it('한 옥타브 안 — 9는 2도 자리, 13은 6도 자리, ♭13은 ♭6도 자리', () => {
     const dom7 = degreeSteps('dom7');
     expect(dom7.find((s) => s.degree === '9')!.semitone).toBe(2);
     expect(dom7.find((s) => s.degree === '13')!.semitone).toBe(9);
+    expect(degreeSteps('dom7b9b13').find((s) => s.degree === 'b13')!.semitone).toBe(8);
     for (const q of QUALITIES) {
       for (const s of degreeSteps(q)) {
         expect(s.semitone, `${q} ${s.degree}`).toBeGreaterThanOrEqual(0);
@@ -48,38 +93,27 @@ describe('도수 드릴 — 찍을 음 (스펙 §4)', () => {
     }
   });
 
-  it('pitch class는 루트에서 이조된다', () => {
-    expect(degreePitchClasses(0, 'maj7')).toEqual([0, 4, 7, 11, 2]); // C E G B D
-    expect(degreePitchClasses(7, 'dom7')).toEqual([7, 11, 5, 9, 4]); // G B F A E
-    expect(degreePitchClasses(2, 'm7b5')).toEqual([2, 5, 8, 0]); // D F Ab C
+  it('C 기준 손검산 (스펙 §4)', () => {
+    const names = (q: Parameters<typeof degreeSteps>[0]) => degreeNoteNames(0, q).map(toGlyphs).join(' ');
+    expect(names('dom7')).toBe('C E G B♭ D A');
+    expect(names('dom7b9b13')).toBe('C E G B♭ D♭ A♭');
+    expect(names('m7b5')).toBe('C E♭ G♭ B♭');
+    expect(names('m6')).toBe('C E♭ G A D');
+    expect(names('maj7')).toBe('C E G B D');
+    expect(names('m7')).toBe('C E♭ G B♭ D');
   });
 
-  it('음이름은 루트 기준 철자 — 보이싱 표기와 같은 글자', () => {
-    expect(degreeNoteNames(0, 'm6').map(toGlyphs)).toEqual(['C', 'E♭', 'G', 'A', 'D']);
-    expect(degreeNoteNames(7, 'dom7b9b13').map(toGlyphs)).toEqual(['G', 'B', 'F', 'A♭', 'E♭']);
-    for (let rootPc = 0; rootPc < 12; rootPc++) {
-      for (const q of QUALITIES) {
-        const drill = degreeNoteNames(rootPc, q);
-        const voiced = buildChord(rootPc, q, 'A').noteNames;
-        // 보이싱에 있는 음은 드릴에도 같은 철자로 있다
-        for (const name of voiced) expect(drill, `${rootPc} ${q}`).toContain(name);
-      }
-    }
-  });
-
-  it('도수가 올라가면 음높이도 올라간다 (화면은 한 옥타브여도)', () => {
-    // C maj7: 1 3 5 7 9 → C3 E3 G3 B3 D4
-    expect(degreeMidis(0, 'maj7')).toEqual([48, 52, 55, 59, 62]);
-    // G7: 1 3 ♭7 9 13 → G3 B3 F4 A4 E5
-    expect(degreeMidis(7, 'dom7')).toEqual([55, 59, 65, 69, 76]);
+  it('72개 전부: 음높이가 단조 증가하고 pitch class는 누르는 자리와 같다', () => {
     for (let rootPc = 0; rootPc < 12; rootPc++) {
       for (const q of QUALITIES) {
         const m = degreeMidis(rootPc, q);
+        expect(m, `${rootPc} ${q}`).toHaveLength(degreeSteps(q).length);
         for (let i = 1; i < m.length; i++) expect(m[i], `${rootPc} ${q}`).toBeGreaterThan(m[i - 1]);
-        // pitch class는 찍을 자리 그대로
         expect(m.map((x) => x % 12)).toEqual(degreePitchClasses(rootPc, q));
       }
     }
+    expect(degreeMidis(0, 'maj7')).toEqual([48, 52, 55, 59, 62]); // C3 E3 G3 B3 D4
+    expect(degreeMidis(0, 'dom7')).toEqual([48, 52, 55, 58, 62, 69]); // C3 E3 G3 B♭3 D4 A4
   });
 
   it('항목은 6 quality × 12루트 = 72개', () => {

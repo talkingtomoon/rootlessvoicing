@@ -251,19 +251,36 @@ export function DegreeRunner({ draw, onExit, keepOrder = false, embedded = false
         </span>
       </div>
 
-      {/* 찍을 칸 — quality마다 칸 수가 다르다 (m7♭5는 넷) */}
-      <div className="flex justify-center gap-2">
+      {/*
+        찍을 칸. quality마다 칸 수가 다르다 (m7♭5는 넷, 두 도미넌트는 여섯).
+        도수는 미리 적어둔다 — "무엇을 누를지"가 아니라 "그 도수가 어디인지"를 익히는 모드다.
+        코드톤은 진하게, 텐션은 연하게. 루트는 테두리로, 손으로 안 치는 음(두 도미넌트의 5)은 점으로 표시한다.
+      */}
+      <div className="flex flex-wrap justify-center gap-1.5">
         {steps.map((step, i) => {
           const filledHere = i < done;
+          const isRoot = step.degree === '1';
+          const unplayed = !step.inVoicing && !isRoot;
           return (
             <div
               key={step.degree}
-              className={`flex h-16 w-16 flex-col items-center justify-center rounded-xl border ${
-                filledHere ? 'border-brass bg-surface' : 'border-line bg-felt-deep'
+              title={unplayed ? '코드엔 있지만 보이싱에선 안 치는 음' : undefined}
+              className={`relative flex h-14 w-[3.25rem] flex-col items-center justify-center rounded-xl border ${
+                filledHere
+                  ? 'border-brass bg-surface'
+                  : isRoot
+                    ? 'border-ivory-dim bg-felt-deep'
+                    : 'border-line bg-felt-deep'
               }`}
             >
-              {/* 도수는 미리 적어둔다 — "무엇을 누를지"가 아니라 "그 도수가 어디인지"를 익히는 모드다 */}
-              <span className={`font-display text-xl ${filledHere ? 'text-ivory' : 'text-ivory-dim'}`}>
+              {unplayed && (
+                <span className="absolute right-1.5 top-1.5 h-1 w-1 rounded-full bg-muted" aria-hidden />
+              )}
+              <span
+                className={`font-display text-lg ${
+                  step.chordTone ? (filledHere ? 'text-ivory' : 'text-ivory-dim') : 'text-muted'
+                }`}
+              >
                 {toGlyphs(step.degree)}
               </span>
               <span className={`text-[11px] ${filledHere ? 'text-brass' : 'text-muted'}`}>
