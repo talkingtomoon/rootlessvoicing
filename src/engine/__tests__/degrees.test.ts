@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { degreeNoteNames, degreePitchClasses, degreeSteps } from '../degrees';
+import { degreeMidis, degreeNoteNames, degreePitchClasses, degreeSteps } from '../degrees';
 import { QUALITIES, getVoicing } from '../voicings';
 import { buildChord } from '../chord';
 import { toGlyphs } from '../spelling';
@@ -63,6 +63,21 @@ describe('도수 드릴 — 찍을 음 (스펙 §4)', () => {
         const voiced = buildChord(rootPc, q, 'A').noteNames;
         // 보이싱에 있는 음은 드릴에도 같은 철자로 있다
         for (const name of voiced) expect(drill, `${rootPc} ${q}`).toContain(name);
+      }
+    }
+  });
+
+  it('도수가 올라가면 음높이도 올라간다 (화면은 한 옥타브여도)', () => {
+    // C maj7: 1 3 5 7 9 → C3 E3 G3 B3 D4
+    expect(degreeMidis(0, 'maj7')).toEqual([48, 52, 55, 59, 62]);
+    // G7: 1 3 ♭7 9 13 → G3 B3 F4 A4 E5
+    expect(degreeMidis(7, 'dom7')).toEqual([55, 59, 65, 69, 76]);
+    for (let rootPc = 0; rootPc < 12; rootPc++) {
+      for (const q of QUALITIES) {
+        const m = degreeMidis(rootPc, q);
+        for (let i = 1; i < m.length; i++) expect(m[i], `${rootPc} ${q}`).toBeGreaterThan(m[i - 1]);
+        // pitch class는 찍을 자리 그대로
+        expect(m.map((x) => x % 12)).toEqual(degreePitchClasses(rootPc, q));
       }
     }
   });

@@ -2,6 +2,7 @@ import type { ChordQuality, NoteName } from './types';
 import type { Item } from './items';
 import { QUALITIES, getVoicing } from './voicings';
 import { ROOT_NAMES, spellDegree } from './spelling';
+import { stackAscending } from './grading';
 
 /**
  * 도수 드릴 — 코드 심볼을 보고 구성음을 **루트부터 차례로** 찍는 층. 보이싱보다 먼저 거친다.
@@ -49,6 +50,15 @@ export function degreeItems(): Item[] {
     for (const quality of QUALITIES) out.push({ rootPc, quality, form: 'A' });
   }
   return out;
+}
+
+/**
+ * 도수 순서대로의 실제 음높이. **도수가 올라가면 음도 올라간다** —
+ * 화면 건반은 한 옥타브뿐이지만 9는 2도 자리를, 13은 6도 자리를 누르되
+ * 소리는 루트에서 위로 쌓아 들려준다(1 3 5 7 9가 실제로 올라가게).
+ */
+export function degreeMidis(rootPc: number, quality: ChordQuality, base = 48): number[] {
+  return stackAscending(degreePitchClasses(rootPc, quality), base);
 }
 
 /** 도수 순서대로의 음이름 (루트 기준 철자) */

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Item } from '../engine/items';
-import { degreeNoteNames, degreeSteps } from '../engine/degrees';
+import { degreeMidis, degreeNoteNames, degreeSteps } from '../engine/degrees';
 import { chordSymbol } from '../engine/format';
 import { ROOT_NAMES, toGlyphs } from '../engine/spelling';
 import { playChord, playNote } from '../audio/audio';
@@ -50,9 +50,21 @@ export function DegreeRunner({ draw, onExit, keepOrder = false, embedded = false
   const steps = item ? degreeSteps(item.quality) : [];
   const names = item ? degreeNoteNames(item.rootPc, item.quality) : [];
   const pcs = item ? steps.map((s) => (item.rootPc + s.semitone) % 12) : [];
+  /** 도수 순서대로의 실제 음높이 — 누를 때 이 소리가 난다 (위로 쌓인다) */
+  const midis = item ? degreeMidis(item.rootPc, item.quality, PAD_FROM) : [];
   const echo = useEcho(pcs, true);
 
-  const sound = useCallback((pc: number) => playNote(PAD_FROM + (((pc - PAD_FROM) % 12) + 12) % 12), []);
+  /**
+   * 그 자리의 소리. 맞는 자리를 눌렀으면 쌓아 올린 음높이로,
+   * 아니면 한 옥타브 안의 그 음으로 들려준다.
+   */
+  const sound = useCallback(
+    (pc: number, index: number) => {
+      const want = pcs[index];
+      playNote(want === pc && midis[index] !== undefined ? midis[index] : PAD_FROM + pc);
+    },
+    [pcs, midis],
+  );
 
   useEffect(() => {
     onRemaining?.(remaining(session));
@@ -91,22 +103,22 @@ export function DegreeRunner({ draw, onExit, keepOrder = false, embedded = false
 
   function reveal() {
     if (phase !== 'input' || !item) return;
-    playChord(pcs.map((pc, i) => PAD_FROM + pc + (i > 0 && pc < pcs[0] ? 12 : 0)));
+    playChord(midis);
     setPhase('reveal');
   }
 
   function press(midi: number) {
     const pc = ((midi % 12) + 12) % 12;
     if (phase === 'echo') {
-      sound(pc);
+      sound(pc, echo.done);
       echo.press(pc);
       return;
     }
     if (phase !== 'input' || !item) {
-      sound(pc);
+      playNote(PAD_FROM + pc);
       return;
     }
-    sound(pc);
+    sound(pc, filledRef.current);
     if (pc === pcs[filledRef.current]) {
       const n = filledRef.current + 1;
       filledRef.current = n;
@@ -250,11 +262,12 @@ export function DegreeRunner({ draw, onExit, keepOrder = false, embedded = false
                 filledHere ? 'border-brass bg-surface' : 'border-line bg-felt-deep'
               }`}
             >
-              <span className={`font-display text-xl ${filledHere ? 'text-ivory' : 'text-muted'}`}>
-                {filledHere || showAll ? toGlyphs(names[i]) : '·'}
+              {/* 도수는 미리 적어둔다 — "무엇을 누를지"가 아니라 "그 도수가 어디인지"를 익히는 모드다 */}
+              <span className={`font-display text-xl ${filledHere ? 'text-ivory' : 'text-ivory-dim'}`}>
+                {toGlyphs(step.degree)}
               </span>
-              <span className="text-[10px] text-muted">
-                {filledHere || showAll ? toGlyphs(step.degree) : ''}
+              <span className={`text-[11px] ${filledHere ? 'text-brass' : 'text-muted'}`}>
+                {filledHere || showAll ? toGlyphs(names[i]) : '·'}
               </span>
             </div>
           );
