@@ -77,6 +77,7 @@ export function TuneView({ onPractice }: Props) {
   }
 
   const current = voiced[cursor];
+  const next = voiced[cursor + 1];
   const highlights: KeyHighlight[] = current.midi.map((midi, i) => ({
     midi,
     label: getVoicing(current.chord.quality, current.form).degrees[i],
@@ -126,13 +127,27 @@ export function TuneView({ onPractice }: Props) {
         })}
       </div>
 
-      {/* 지금 코드 */}
-      <div className="text-center">
-        <div className="font-display text-3xl text-ivory">{current.chord.label}</div>
-        <div className="mt-1 text-sm text-ivory-dim">
-          {current.form}형 · {current.noteNames.map(toGlyphs).join(' ')}
-          {current.moved > 0 && <span className="text-muted"> · 앞 코드에서 {current.moved}성부</span>}
+      {/* 지금 코드 — 오른쪽에 다음 코드를 미리 띄운다 (재생 중에 다음 자리를 잡으려고) */}
+      <div className="flex items-stretch justify-center gap-3">
+        <div className="text-center">
+          <div className="font-display text-3xl text-ivory">{current.chord.label}</div>
+          <div className="mt-1 whitespace-nowrap text-sm text-ivory-dim">
+            {current.form}형 · {current.noteNames.map(toGlyphs).join(' ')}
+          </div>
+          {current.moved > 0 && (
+            <div className="text-xs text-muted">앞 코드에서 {current.moved}성부 움직임</div>
+          )}
         </div>
+        {next && (
+          <div className="flex flex-col justify-center whitespace-nowrap border-l border-line pl-3 text-left">
+            <div className="text-[10px] tracking-widest text-muted">다음</div>
+            <div className="font-display text-xl text-ivory-dim">{next.chord.label}</div>
+            <div className="text-xs text-muted">
+              {next.form}형
+              {next.moved > 0 && <> · {next.moved}성부</>}
+            </div>
+          </div>
+        )}
       </div>
 
       <Keyboard highlights={highlights} onKeyPress={() => {}} />
