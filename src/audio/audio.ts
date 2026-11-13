@@ -163,6 +163,33 @@ export function playChord(midi: number[], duration = 1.5): void {
   current().triggerAttackRelease(toNotes(midi), duration);
 }
 
+/** 울리고 있는 소리를 끊는다 (곡 재생 중지 등) */
+export function stopAll(): void {
+  try {
+    current().releaseAll();
+  } catch {
+    // 폴백 신스는 releaseAll이 없을 수 있다 — 무시
+  }
+}
+
+/**
+ * 길이가 제각각인 코드들을 이어서 재생한다 (곡 모드).
+ * 각 코드는 제 박만큼 울리고, 반환값은 UI가 현재 코드를 따라가기 위한 ms 오프셋이다.
+ */
+export function playProgression(chords: { midi: number[]; seconds: number }[]): number[] {
+  ensureRunning();
+  const inst = current();
+  const start = Tone.now();
+  const offsets: number[] = [];
+  let at = 0;
+  for (const { midi, seconds } of chords) {
+    offsets.push(at * 1000);
+    inst.triggerAttackRelease(toNotes(midi), seconds * 0.95, start + at);
+    at += seconds;
+  }
+  return offsets;
+}
+
 /** 세 코드 순차 재생. 오디오는 정밀 스케줄, UI 동기화는 반환된 ms 오프셋으로. */
 export function playChordSequence(chords: number[][], gapSec = 1.0): number[] {
   ensureRunning();

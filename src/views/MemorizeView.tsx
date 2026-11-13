@@ -8,6 +8,8 @@ import { QUALITY_SYMBOL } from '../engine/format';
 import { ROOT_NAMES, toGlyphs } from '../engine/spelling';
 import { DrillRunner } from '../components/DrillRunner';
 import { DegreeRunner } from '../components/DegreeRunner';
+import { TuneView, tuneItems } from './TuneView';
+import { TUNES, type Tune } from '../engine/tunes';
 import { degreeItems } from '../engine/degrees';
 import { shuffle } from '../lib/shuffle';
 import { studyDay } from '../state/day';
@@ -52,6 +54,8 @@ export function MemorizeView({ store, onFinish, degrees, onDegreesChange, settin
   const [quality, setQuality] = useState(loadLastQuality);
   const [form, setForm] = useState<Form>(loadLastForm);
   const [keyOrder, setKeyOrder] = useState<KeyOrder>(loadKeyOrder);
+  /** 곡 모드에서 연습할 곡 */
+  const [tune, setTune] = useState<Tune>(TUNES[0]);
   const [degreeLabels, setDegreeLabels] = useState(loadDegreeLabels);
 
   /** 도수 드릴 풀 — 6 quality × 12루트 = 72개 (폼은 쓰지 않는다) */
@@ -100,6 +104,19 @@ export function MemorizeView({ store, onFinish, degrees, onDegreesChange, settin
     return () => window.removeEventListener('keydown', h);
   }, [running, mode, n, start]);
 
+  // 곡 모드: 코드 순서 그대로 (폼은 voiceTune이 정한 것)
+  if (running && mode === 'tune') {
+    return (
+      <DrillRunner
+        draw={() => tuneItems(tune)}
+        keepOrder
+        showDegrees={degreeLabels}
+        onExit={() => setRunning(false)}
+        onFinish={onFinish}
+      />
+    );
+  }
+
   if (running && mode === 'degree') {
     const size = Math.min(n, degreePool.length);
     return (
@@ -137,8 +154,8 @@ export function MemorizeView({ store, onFinish, degrees, onDegreesChange, settin
   return (
     <div className="mx-auto flex max-w-3xl flex-col items-center gap-7 px-4 py-10">
       <Seg
-        options={['all', 'type', 'degree'] as MemorizeMode[]}
-        labels={['전체', '타입별', '도수']}
+        options={['all', 'type', 'degree', 'tune'] as MemorizeMode[]}
+        labels={['전체', '타입별', '도수', '곡']}
         value={mode}
         onChange={(m) => {
           setMode(m);
@@ -146,7 +163,14 @@ export function MemorizeView({ store, onFinish, degrees, onDegreesChange, settin
         }}
       />
 
-      {mode === 'degree' ? (
+      {mode === 'tune' ? (
+        <TuneView
+          onPractice={(t) => {
+            setTune(t);
+            setRunning(true);
+          }}
+        />
+      ) : mode === 'degree' ? (
         <>
           <div className="text-center">
             <div className="text-xs tracking-widest text-muted">보이싱 앞 층 · 72개에서 랜덤</div>
@@ -273,7 +297,7 @@ export function MemorizeView({ store, onFinish, degrees, onDegreesChange, settin
 
       {/* 세션 옵션 — 세션 간 유지된다 */}
       <div className="flex flex-col items-center gap-3 border-t border-line pt-6">
-        {mode !== 'all' && (
+        {mode !== 'all' && mode !== 'tune' && (
           <label className="flex items-center gap-3 text-sm text-muted">
             키 순서
             <Seg
@@ -304,7 +328,9 @@ export function MemorizeView({ store, onFinish, degrees, onDegreesChange, settin
         <p className="max-w-sm text-center text-xs text-muted">
           {mode === 'all'
             ? '전체는 늘 랜덤이다 — 4도로 줄 세우면 다음 루트가 예고된다'
-            : '4도 순환이 기본 — 코드가 실제로 움직이는 방향이고 손 이동이 작다'}
+            : mode === 'tune'
+              ? '곡은 코드가 나오는 순서 그대로 — 섞지 않는다'
+              : '4도 순환이 기본 — 코드가 실제로 움직이는 방향이고 손 이동이 작다'}
         </p>
       </div>
     </div>

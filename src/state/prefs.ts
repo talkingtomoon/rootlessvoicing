@@ -45,11 +45,11 @@ export function saveLastOrder(o: 'fourths' | 'chromatic'): void {
   localStorage.setItem(LAST_ORDER_KEY, o);
 }
 
-export type MemorizeMode = 'all' | 'type' | 'degree';
+export type MemorizeMode = 'all' | 'type' | 'degree' | 'tune';
 
 export function loadLastMemorizeMode(): MemorizeMode {
   const v = localStorage.getItem(LAST_MEMORIZE_MODE_KEY);
-  return v === 'type' || v === 'degree' ? v : 'all';
+  return v === 'type' || v === 'degree' || v === 'tune' ? v : 'all';
 }
 
 export function saveLastMemorizeMode(m: MemorizeMode): void {
