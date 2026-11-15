@@ -272,6 +272,8 @@ canonical이 실제로 쓰는 구간은 49–71(`CANONICAL_MIN/MAX`)이고, 건�
   **스트릭 숫자·XP·배지는 없다**
 - 아이폰: 홈 화면 앱(manifest, apple-touch-icon — `node scripts/gen-icons.mjs`), safe-area, 배포본만 서비스워커
   (`public/sw.js`: HTML 네트워크 우선, 나머지·피아노 샘플 캐시 우선). **사파리와 홈 화면 앱은 localStorage가 따로다**
+  HTML은 `fetch(url, { cache: 'no-store' })`로 받는다 — Pages가 HTML에 `max-age=600`을 붙여서
+  그냥 fetch하면 배포 뒤에도 예전 화면이 뜬다. 이 경로를 캐시 우선으로 되돌리지 마라
 
 ## 저장 · 진도 (Leitner)
 
